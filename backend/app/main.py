@@ -5,6 +5,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
+from .core import account_route
+
 #=== SETUP ===
 
 @asynccontextmanager
@@ -43,6 +45,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 	)
 
 #=== API PATHS ===
+app.include_router(account_route)
 
 @app.get('/')
 async def root():
