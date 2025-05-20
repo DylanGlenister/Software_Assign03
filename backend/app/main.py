@@ -5,15 +5,19 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
-from .core import account_route
+
+from .utils.database import MongoDB 
+from .core.account_route import account_route
 
 #=== SETUP ===
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	# Startup
+	#Startup
+	app.state.mongodb = MongoDB("mongodb://localhost:27017", "Software_Assign03")
 	yield
-	# Shutdown
+	#Shutdown
+	app.state.mongodb.client.close()
 
 app = FastAPI(lifespan=lifespan)
 api_path = '/api/v1/endpoints'
