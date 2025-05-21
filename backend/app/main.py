@@ -5,9 +5,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 
-
-from .utils.database import MongoDB 
 from .core.account_route import account_route
+from .utils.database import MongoDB
 
 #=== SETUP ===
 
