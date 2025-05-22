@@ -1,22 +1,23 @@
 import time
 from contextlib import asynccontextmanager
 
+from app.core.database import Database as db
+#from app.core.account_route import account_route
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
-
-from .core.account_route import account_route
-from .utils.database import MongoDB
+from fastapi.responses import JSONResponse
 
 #=== SETUP ===
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 	#Startup
-	app.state.mongodb = MongoDB("mongodb://localhost:27017", "Software_Assign03")
+	#app.state.mongodb = MongoDB("mongodb://localhost:27017", "Software_Assign03")
+	db.connect()
 	yield
 	#Shutdown
-	app.state.mongodb.client.close()
+	#app.state.mongodb.client.close()
+	db.disconnect
 
 app = FastAPI(lifespan=lifespan)
 api_path = '/api/v1/endpoints'
@@ -48,7 +49,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 	)
 
 #=== API PATHS ===
-app.include_router(account_route)
+#app.include_router(account_route)
 
 @app.get('/')
 async def root():
@@ -70,3 +71,14 @@ async def root():
 async def base_api():
 	'''Displays a message when the api endpoint is reached.'''
 	return { 'Result': 'Your\'e did it' }
+
+@app.get(api_path + '/test/sql')
+async def test_sql():
+	'''Test a sql command.'''
+	result = db.test_select()
+
+	output = [f'id: {id}, value: {value}' for (id, value) in result]
+
+	return { 'Result': {
+		'Output': output
+	} }
