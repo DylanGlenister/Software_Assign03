@@ -1,3 +1,4 @@
 fastapi
 uvicorn
 mariadb
+pydantic[email]
