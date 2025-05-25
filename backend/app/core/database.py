@@ -1,170 +1,206 @@
-# Module Imports
-import os
-
 import mariadb
+from typing import Generator, Any, List, Optional, Tuple
+from datetime import datetime
+from ..utils.settings import SETTINGS
 
 class Database:
-	initialised = False
-	__conn: mariadb.Connection
-	__cur: mariadb.Cursor
+	__pool: mariadb.ConnectionPool = None
 
 	@classmethod
-	def connect(cls):
+	def initialize_pool(cls):
+		if cls.__pool:
+			return
+
 		try:
-			cls.__conn = mariadb.connect(
-				user="admin",
-				password="password",
-				host="localhost",
-				port=3306,
-				database="awe_electronics"
+			cls.__pool = mariadb.ConnectionPool(
+				pool_name="mypool",
+				pool_size=5,
+				user=SETTINGS.database_username,
+				password=SETTINGS.database_password,
+				host=SETTINGS.database_host,
+				port=SETTINGS.database_port,
+				database=SETTINGS.database
 			)
-			cls.__cur = cls.__conn.cursor()
-			cls.initialised = True
+			print("Connection pool created successfully")
 		except mariadb.Error as e:
-			print(f"Error connecting to MariaDB Platform: {e}")
-
+			print(f"Error creating connection pool: {e}")
+	
 	@classmethod
-	def disconnect(cls):
-		if not cls.initialised:
-			return
-		cls.__conn.close()
+	def get_connection(cls):
+		if not cls.__pool:
+			cls.initialize_pool()
+		return cls.__pool.get_connection()
 
-	@classmethod
-	def commit(cls):
-		if not cls.initialised:
-			return
-		cls.__conn.commit()
+	def __init__(self, conn: mariadb.Connection):
+		self.conn: mariadb.Connection = conn
+		self.cur: mariadb.Cursor = conn.cursor()
 
-	@classmethod
-	def rollback(cls):
-		if not cls.initialised:
-			return
-		cls.__conn.rollback()
+	def close(self):
+		self.cur.close()
+		self.conn.close()
 
-	@classmethod
-	def execute_from_file(cls, _path: str, _debug = False):
-		'''Should not be used for commands that retrive information.'''
-		if not cls.initialised:
-			return
-		with open(os.path.abspath(_path), 'r') as file:
-			commands = file.read().split(';')
-			for comm in commands:
-				comm = comm.strip()
-				if (comm == ''):
-					continue
-				if (_debug):
-					print(comm)
-				cls.__cur.execute(comm)
+	def commit(self):
+		self.conn.commit()
 
-	@classmethod
-	def test_insert(cls):
-		if not cls.initialised:
-			return
-		for i in range(10):
-			cls.__cur.execute('INSERT INTO test (value) VALUES (?)', (i,))
+	def rollback(self):
+		self.conn.rollback()
 
-	@classmethod
-	def test_select(cls):
-		result: list[tuple[int, int]] = []
-		if not cls.initialised:
-			return result
+	# --- Internal query helpers ---
+
+	def _fetch_one(self, query: str, params: Tuple = ()) -> Optional[Tuple[Any]]:
 		try:
-			cls.__cur.execute('SELECT * FROM test')
-			for (id, value) in Database.__cur:
-				result.append((id, value))
+			self.cur.execute(query, params)
+			return self.cur.fetchone()
 		except mariadb.Error as e:
-			print(e)
-		return result
+			print(f"DB error in fetchone: {e}")
+			return None
 
-	# === BRAINSTORMING IDEAS ===
+	def _fetch_all(self, query: str, params: Tuple = ()) -> List[Tuple[Any]]:
+		try:
+			self.cur.execute(query, params)
+			return self.cur.fetchall()
+		except mariadb.Error as e:
+			print(f"DB error in fetchall: {e}")
+			return []
 
-	@classmethod
-	def get_trolley(cls, _user):
-		'''Will return trolley data from the database.'''
-		return { 'Result': True }
+	def _execute(self, query: str, params: Tuple = ()) -> bool:
+		try:
+			self.cur.execute(query, params)
+			self.commit()
+			return True
+		except mariadb.Error as e:
+			print(f"DB error in execute: {e}, rolling back")
+			self.rollback()
+			return False
 
-	@classmethod
-	def save_trolley(cls, _user):
-		'''Will save data from the trolley to the database.'''
-		return { 'Result': True }
+	# --- Public API methods ---
 
-	@classmethod
-	def query_products(cls, **args):
-		'''Given some filtering options, will return a list of products.'''
-		return { 'Result': True }
+	def get_account_by_email(self, email: str) -> Optional[Tuple]:
+		query: str = """
+		SELECT accountID, email, password, creationDate, roleID, statusID 
+		FROM accounts 
+		WHERE email = ?
+		"""
+		return self._fetch_one(query, (email,))
 
-	@classmethod
-	def get_price(cls, _product):
-		'''Will return the price of a specific product.'''
-		return { 'Result': True }
+	def get_account_by_id(self, account_id: int) -> Optional[Tuple]:
+		query: str = """
+		SELECT accountID, email, password, creationDate, roleID, statusID
+		FROM accounts
+		WHERE accountID = ?
+		"""
+		return self._fetch_one(query, (account_id,))
 
-	@classmethod
-	def save_order(cls, _order):
-		'''Will save an order to the database.'''
-		return { 'Result': True }
 
-	@classmethod
-	def load_order(cls, _order):
-		'''Will load an order from the database.'''
-		return { 'Result': True }
+	def create_account(self, email: str, password: str, creation_date: datetime, roleID: int = 1, statusID: int = 1) -> Optional[int]:
+		query: str = """
+			INSERT INTO accounts (email, password, creationDate, roleID, statusID)
+			VALUES (%s, %s, %s, %s, %s)
+		"""
+		params: Tuple = (email, password, creation_date, roleID, statusID)
+		success: Optional[int] = self._execute(query, params)
 
-	@classmethod
-	def add_account(cls, _accountInfo):
-		'''Will add an account to the database.'''
-		return { 'Result': True }
+		if success:
+			return self.cur.lastrowid
+		else:
+			return None
+	
+	def role_exists(self, role_id: int) -> bool:
+		query = "SELECT 1 FROM roles WHERE roleID = ?"
+		return self._fetch_one(query, (role_id,)) is not None
 
-	@classmethod
-	def get_account(cls, _account):
-		'''Will retrieve account information from the database.'''
-		return { 'Result': True }
+	def status_exists(self, status_id: int) -> bool:
+		query = "SELECT 1 FROM status WHERE statusID = ?"
+		return self._fetch_one(query, (status_id,)) is not None
 
-	@classmethod
-	def save_invoice(cls, _invoice):
-		'''Will save an invoice to the database.'''
-		return { 'Result': True }
+	
+	def get_role(self, role_id: int) -> Optional[Tuple]:
+		query = "SELECT roleID, name FROM roles WHERE roleID = ?"
+		return self._fetch_one(query, (role_id,))
+	
+	def update_account(self, account_id: int, **fields) -> bool:
+		if not fields:
+			return False
 
-	@classmethod
-	def save_receipt(cls, _receipt):
-		'''Will save a receipt to the database.'''
-		return { 'Result': True }
+		set_clause = ", ".join(f"{key} = ?" for key in fields)
+		params = tuple(fields.values()) + (account_id,)
 
-	@classmethod
-	def get_invoice(cls, _invoice):
-		'''Will retrieve an invoice from the database.'''
-		return { 'Result': True }
+		query = f"UPDATE accounts SET {set_clause} WHERE accountID = ?"
+		return self._execute(query, params)
+	
+	def get_all_products(self) -> List[Tuple]:
+		query: str = "SELECT * FROM products"
+		return self._fetch_all(query)
+	
+	def test_select(self) -> List[Tuple[int, int]]:
+		query: str = "SELECT * FROM test"
+		return self._fetch_all(query)
+	
+	def get_trolly(self, account_id: int) -> list[tuple]:
+		query = """
+			SELECT productID
+			FROM trolly
+			WHERE customerID = ?
+		"""
+		return self._fetch_all(query, (account_id,))
+	
+	def add_to_trolly(self, account_id: int, product_id: int, amount: int = 1) -> bool:
+		select_query = """
+			SELECT amount FROM trolleys
+			WHERE customerID = ? AND productID = ?
+		"""
+		existing = self._fetch_one(select_query, (account_id, product_id))
+		if existing:
+			new_amount = existing[0] + amount
+			update_query = """
+				UPDATE trolleys SET amount = ?
+				WHERE customerID = ? AND productID = ?
+			"""
+			return self._execute(update_query, (new_amount, account_id, product_id))
+		else:
+			insert_query = """
+				INSERT INTO trolleys (customerID, productID, amount)
+				VALUES (?, ?, ?)
+			"""
+			return self._execute(insert_query, (account_id, product_id, amount))
+	
+	def remove_from_trolly(self, account_id: int, product_id: int, amount: int = 1) -> bool:
+		select_query = """
+			SELECT amount FROM trolleys
+			WHERE customerID = ? AND productID = ?
+		"""
+		existing = self._fetch_one(select_query, (account_id, product_id))
+		if not existing:
+			return False
 
-	@classmethod
-	def get_receipt(cls, _receipt):
-		'''Will retrieve a receipt from the database.'''
-		return { 'Result': True }
+		current_amount = existing[0]
+		if current_amount <= amount:
+			delete_query = """
+				DELETE FROM trolleys
+				WHERE customerID = ? AND productID = ?
+			"""
+			return self._execute(delete_query, (account_id, product_id))
+		else:
+			new_amount = current_amount - amount
+			update_query = """
+				UPDATE trolleys SET amount = ?
+				WHERE customerID = ? AND productID = ?
+			"""
+			return self._execute(update_query, (new_amount, account_id, product_id))
+	
+	def clear_trolly(self, account_id: int) -> bool:
+		delete_all_query = """
+			DELETE FROM trolleys
+			WHERE customerID = ?
+		"""
+		return self._execute(delete_all_query, (account_id,))
 
-	@classmethod
-	def save_report(cls, _receipt):
-		'''Will save a report to the database.'''
-		return { 'Result': True }
 
-	@classmethod
-	def get_report(cls, _receipt):
-		'''Will retrieve a report from the database.'''
-		return { 'Result': True }
-
-	@classmethod
-	def get_sales_data(cls):
-		'''Will retrieve sales data from the database.'''
-		return { 'Result': True }
-
-def test():
-	Database.connect()
-	Database.execute_from_file('./app/sql/test.sql')
-	Database.test_insert()
-	# Make the changes permanent
-	Database.commit()
-	result = Database.test_select()
-	for (id, value) in result:
-		print(f'id: {id}, value: {value}')
-	## Rollback in case of error
-	#Database.rollback()
-	Database.disconnect()
-
-if __name__ == '__main__':
-	test()
+def get_db() -> Generator[Database, None, None]:
+	Database.initialize_pool()
+	conn = Database.get_connection()
+	db: Database = Database(conn)
+	try:
+		yield db
+	finally:
+		db.close()

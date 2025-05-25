@@ -1,4 +1,9 @@
 fastapi
 uvicorn
 mariadb
+python-dotenv
+pydantic-settings 
 pydantic[email]
+bcrypt
+pyjwt
+passlib

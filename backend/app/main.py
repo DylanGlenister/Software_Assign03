@@ -1,26 +1,27 @@
 import time
 from contextlib import asynccontextmanager
 
-from app.core.database import Database as db
-#from app.core.account_route import account_route
-from fastapi import FastAPI, HTTPException, Request
+from app.core.database import Database, get_db
+from app.utils.settings import SETTINGS
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer
+
+from app.core.account_route import account_route
+from app.core.customer_route import customer_route
 
 #=== SETUP ===
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	#Startup
-	#app.state.mongodb = MongoDB("mongodb://localhost:27017", "Software_Assign03")
-	db.connect()
 	yield
-	#Shutdown
-	#app.state.mongodb.client.close()
-	db.disconnect
 
-app = FastAPI(lifespan=lifespan)
-api_path = '/api/v1/endpoints'
+app = FastAPI(
+	lifespan=lifespan,
+	)
+
+bearer_scheme = HTTPBearer()
 
 # Add CORS middleware, required for frontend connection to work
 app.add_middleware(
@@ -49,7 +50,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 	)
 
 #=== API PATHS ===
-#app.include_router(account_route)
+app.include_router(account_route)
+app.include_router(customer_route)
 
 @app.get('/')
 async def root():
@@ -62,23 +64,29 @@ async def root():
 		},
 		'Api path': {
 			'Type': 'GET',
-			'Path': api_path,
+			'Path': SETTINGS.api_path,
 			'Description': 'Test endpoint.'
 		}
 	} }
 
-@app.get(api_path)
+@app.get(SETTINGS.api_path)
 async def base_api():
 	'''Displays a message when the api endpoint is reached.'''
 	return { 'Result': 'Your\'e did it' }
 
-@app.get(api_path + '/test/sql')
-async def test_sql():
-	'''Test a sql command.'''
+@app.get(SETTINGS.api_path + '/test/sql')
+async def test_sql(db: Database = Depends(get_db)):
+	'''Test a SQL SELECT query from the test table.'''
 	result = db.test_select()
 
 	output = [f'id: {id}, value: {value}' for (id, value) in result]
 
-	return { 'Result': {
-		'Output': output
-	} }
+	return {
+		'Result': {
+			'Output': output
+		}
+	}
+
+@app.get("/secure-example", dependencies=[Depends(bearer_scheme)])
+def secure_example():
+    return {"message": "You are authorized"}
