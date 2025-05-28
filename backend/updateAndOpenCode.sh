@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PROJECT_DIR="$(pwd)"
-VENV_DIR="$PROJECT_DIR/venv"
+VENV_DIR="$PROJECT_DIR/.venv"
 
 if [ ! -d "$VENV_DIR" ]; then
     echo "Creating virtual environment..."
