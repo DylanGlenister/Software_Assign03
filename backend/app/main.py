@@ -10,6 +10,7 @@ from fastapi.security import HTTPBearer
 
 from app.core.account_route import account_route
 from app.core.customer_route import customer_route
+from app.core.admin_route import admin_route
 
 #=== SETUP ===
 
@@ -26,7 +27,7 @@ bearer_scheme = HTTPBearer()
 # Add CORS middleware, required for frontend connection to work
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=["http://localhost:3000"], # URL of React application
+	allow_origins=["*"], # URL of React application
 	allow_credentials=True,
 	allow_methods=["*"],
 	allow_headers=["*"],
@@ -52,6 +53,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 #=== API PATHS ===
 app.include_router(account_route)
 app.include_router(customer_route)
+app.include_router(admin_route)
 
 @app.get('/')
 async def root():

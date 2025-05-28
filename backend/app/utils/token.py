@@ -43,7 +43,7 @@ def get_current_account(token: str = Depends(get_token_from_header), db: Databas
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
     account_id = payload.get("account_ID")
-    row = db.get_account_by_id(account_id)
+    row = db.get_account(account_id=account_id)
     if not row:
         raise HTTPException(status_code=404, detail="Account not found")
     return Account(*row)

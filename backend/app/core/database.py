@@ -63,47 +63,44 @@ class Database:
 			print(f"DB error in fetchall: {e}")
 			return []
 
-	def _execute(self, query: str, params: Tuple = ()) -> bool:
+	def _execute(self, query: str, params: Tuple = (), return_last_id: bool = False):
 		try:
 			self.cur.execute(query, params)
 			self.commit()
-			return True
+			return self.cur.lastrowid if return_last_id else True
 		except mariadb.Error as e:
 			print(f"DB error in execute: {e}, rolling back")
 			self.rollback()
-			return False
+			return None if return_last_id else False
 
 	# --- Public API methods ---
 
-	def get_account_by_email(self, email: str) -> Optional[Tuple]:
-		query: str = """
-		SELECT accountID, email, password, creationDate, roleID, statusID 
-		FROM accounts 
-		WHERE email = ?
-		"""
-		return self._fetch_one(query, (email,))
-
-	def get_account_by_id(self, account_id: int) -> Optional[Tuple]:
-		query: str = """
-		SELECT accountID, email, password, creationDate, roleID, statusID
-		FROM accounts
-		WHERE accountID = ?
-		"""
-		return self._fetch_one(query, (account_id,))
+	def get_account(self, *, email: Optional[str] = None, account_id: Optional[int] = None) -> Optional[Tuple]:
+		if email:
+			query = """
+				SELECT accountID, email, password, creationDate, roleID, statusID
+				FROM accounts
+				WHERE email = ?
+			"""
+			return self._fetch_one(query, (email,))
+		elif account_id:
+			query = """
+				SELECT accountID, email, password, creationDate, roleID, statusID
+				FROM accounts
+				WHERE accountID = ?
+			"""
+			return self._fetch_one(query, (account_id,))
+		else:
+			return None
 
 
 	def create_account(self, email: str, password: str, creation_date: datetime, roleID: int = 1, statusID: int = 1) -> Optional[int]:
-		query: str = """
+		query = """
 			INSERT INTO accounts (email, password, creationDate, roleID, statusID)
-			VALUES (%s, %s, %s, %s, %s)
+			VALUES (?, ?, ?, ?, ?)
 		"""
-		params: Tuple = (email, password, creation_date, roleID, statusID)
-		success: Optional[int] = self._execute(query, params)
-
-		if success:
-			return self.cur.lastrowid
-		else:
-			return None
+		params = (email, password, creation_date, roleID, statusID)
+		return self._execute(query, params, return_last_id=True)
 	
 	def role_exists(self, role_id: int) -> bool:
 		query = "SELECT 1 FROM roles WHERE roleID = ?"
@@ -194,6 +191,17 @@ class Database:
 			WHERE customerID = ?
 		"""
 		return self._execute(delete_all_query, (account_id,))
+	
+	def delete_account(self, account_id: int) -> bool:
+		query = "DELETE FROM accounts WHERE accountID = ?"
+		return self._execute(query, (account_id,))
+	
+	def get_all_accounts(self) -> List[Tuple]:
+		query = """
+			SELECT accountID, email, creationDate, roleID, statusID
+			FROM accounts
+		"""
+		return self._fetch_all(query)
 
 
 def get_db() -> Generator[Database, None, None]:

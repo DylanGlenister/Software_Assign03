@@ -12,7 +12,7 @@ class CustomerAccount(Account):
     @classmethod
     def register(cls, db: Database, email: EmailStr, password: str, role_ID: int = 1, status_ID: int = 1) -> dict:
         """Create a new account with hashed password."""
-        existing: Tuple = db.get_account_by_email(email)
+        existing: Tuple = db.get_account(email=email)
         if existing:
             return {"error": "An account with that email already exists"}
         
