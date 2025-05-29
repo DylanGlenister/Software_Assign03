@@ -6,8 +6,8 @@ class Product:
     This is the data holder for products
     """
     def __init__(self, product_id: int = None, name: str = "", description: str = "",
-                 price: float = 0.0, stock: int = 0, tags: List[str] = None,
-                 images: List[str] = None, is_available: bool = True):
+             price: float = 0.0, stock: int = 0, tags: List[str] = None,
+             images: List[str] = None, available_for_sale: int = 0):
         
         self.product_id = product_id
         self.name = name
@@ -17,7 +17,8 @@ class Product:
         self.tags = tags or []
         self.images = images or []
         # self.is_active = is_active can just check in stock
-        self.is_available = is_available
+        #self.is_available = is_available
+        self.available_for_sale = available_for_sale
         self.created_date = datetime.now()
 
     def to_dict(self) -> dict:
@@ -25,16 +26,16 @@ class Product:
         conv obj -> dict for API and DB comm
         """
         return {
-            'productID': self.product_id,
-            'name': self.name,
-            'description': self.description,
-            'price': self.price,
-            'stock': self.stock,
-            'tags': self.tags,
-            'images': self.images,
-            'is_available': self.is_available,  
-            # 'isActive': self.is_active,
-            'createdDate': self.created_date.isoformat() if self.created_date else None
+        'productID': self.product_id,
+        'name': self.name,
+        'description': self.description,
+        'price': self.price,
+        'stock': self.stock,
+        'tags': self.tags,
+        'images': self.images,
+        'available_for_sale': self.available_for_sale,
+        'createdDate': self.created_date.isoformat() if self.created_date else None
+
         }
 
     @classmethod
@@ -51,22 +52,20 @@ class Product:
             stock=int(data.get('stock', 0)),
             tags=data.get('tags', []),
             images=data.get('images', []),
-            is_available=data.get('is_available', True)  
+            available_for_sale=int(data.get('available_for_sale', 0))
         )
         return product
 
-    def update_available(self, quantity: int):
-        """Use this as a storage count between in trolley vs actually ordered
-        is_available would be reduced once a user adds a product to the trolley
-        but stock would only be updated when the order is confirmed"""
-        if self.is_available >= quantity:
-            self.is_available -= quantity
+    def update_available_for_sale(self, quantity: int):
+        """Reduce available_for_sale when items added to trolley"""
+        if self.available_for_sale >= quantity:
+            self.available_for_sale -= quantity
             return True
         return False
-
+    
     def is_in_stock(self) -> bool:
-        """Check if product is in stock."""
-        return self.stock > 0 and self.is_available  
+        """Check if product is in stock and available for sale."""
+        return self.stock > 0 and self.available_for_sale >= 1
 
     def reduce_stock(self, quantity: int) -> bool:
         """
