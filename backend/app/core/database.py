@@ -22,16 +22,13 @@ class Database:
 				database=SETTINGS.database
 			)
 			print("Connection pool created successfully")
-			print(cls.__pool)
 		except mariadb.Error as e:
 			print(f"Error creating connection pool: {e}")
-
+	
 	@classmethod
 	def get_connection(cls):
-		print(cls.__pool)
 		if not cls.__pool:
 			cls.initialize_pool()
-			print(cls.__pool)
 		return cls.__pool.get_connection()
 
 	def __init__(self, conn: mariadb.Connection):
@@ -104,7 +101,7 @@ class Database:
 		"""
 		params = (email, password, creation_date, roleID, statusID)
 		return self._execute(query, params, return_last_id=True)
-
+	
 	def role_exists(self, role_id: int) -> bool:
 		query = "SELECT 1 FROM roles WHERE roleID = ?"
 		return self._fetch_one(query, (role_id,)) is not None
@@ -113,11 +110,11 @@ class Database:
 		query = "SELECT 1 FROM status WHERE statusID = ?"
 		return self._fetch_one(query, (status_id,)) is not None
 
-
+	
 	def get_role(self, role_id: int) -> Optional[Tuple]:
 		query = "SELECT roleID, name FROM roles WHERE roleID = ?"
 		return self._fetch_one(query, (role_id,))
-
+	
 	def update_account(self, account_id: int, **fields) -> bool:
 		if not fields:
 			return False
@@ -127,23 +124,23 @@ class Database:
 
 		query = f"UPDATE accounts SET {set_clause} WHERE accountID = ?"
 		return self._execute(query, params)
-
+	
 	def get_all_products(self) -> List[Tuple]:
 		query: str = "SELECT * FROM products"
 		return self._fetch_all(query)
-
+	
 	def test_select(self) -> List[Tuple[int, int]]:
 		query: str = "SELECT * FROM test"
 		return self._fetch_all(query)
-
+	
 	def get_trolly(self, account_id: int) -> list[tuple]:
 		query = """
-			SELECT productID, amount
-			FROM trolleys
+			SELECT productID
+			FROM trolly
 			WHERE customerID = ?
 		"""
 		return self._fetch_all(query, (account_id,))
-
+	
 	def add_to_trolly(self, account_id: int, product_id: int, amount: int = 1) -> bool:
 		select_query = """
 			SELECT amount FROM trolleys
@@ -163,7 +160,7 @@ class Database:
 				VALUES (?, ?, ?)
 			"""
 			return self._execute(insert_query, (account_id, product_id, amount))
-
+	
 	def remove_from_trolly(self, account_id: int, product_id: int, amount: int = 1) -> bool:
 		select_query = """
 			SELECT amount FROM trolleys
@@ -187,18 +184,18 @@ class Database:
 				WHERE customerID = ? AND productID = ?
 			"""
 			return self._execute(update_query, (new_amount, account_id, product_id))
-
+	
 	def clear_trolly(self, account_id: int) -> bool:
 		delete_all_query = """
 			DELETE FROM trolleys
 			WHERE customerID = ?
 		"""
 		return self._execute(delete_all_query, (account_id,))
-
+	
 	def delete_account(self, account_id: int) -> bool:
 		query = "DELETE FROM accounts WHERE accountID = ?"
 		return self._execute(query, (account_id,))
-
+	
 	def get_all_accounts(self) -> List[Tuple]:
 		query = """
 			SELECT accountID, email, creationDate, roleID, statusID
