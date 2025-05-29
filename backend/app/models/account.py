@@ -33,13 +33,14 @@ class Account:
 		if checkpw(password.encode('utf-8'), db_password.encode('utf-8')):
 			return cls(account_ID, db_email, db_password, creation_date, role_ID, status_ID)
 		else:
+			print(password)
 			print("Password incorrect.")
 			return None
-	
+
 	def verify_perms(self, db: Database, required_roles: list[int]) -> bool:
 		role: dict = db.get_role(self.role_ID)
 		return role.roleID in required_roles
-	
+
 	def update_info(self, db: Database, **fields) -> bool:
 		valid_fields: dict = {"email", "status_ID"}
 
@@ -75,11 +76,11 @@ class Account:
 			for key, value in filtered_fields.items():
 				setattr(self, key, value)
 		return {"success": success}
-	
+
 	def change_password(self, db: Database, new_password: str) -> bool:
 		if len(new_password) < 8:
 			return {"error": "Password must be at least 8 characters long."}
-		
+
 		if not any(char.isupper() for char in new_password):
 			return {"error": "Password must contain at least one uppercase letter."}
 
