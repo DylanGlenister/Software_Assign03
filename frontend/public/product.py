@@ -35,7 +35,6 @@ class Product:
         'images': self.images,
         'available_for_sale': self.available_for_sale,
         'createdDate': self.created_date.isoformat() if self.created_date else None
-
         }
 
     @classmethod
@@ -44,17 +43,43 @@ class Product:
         dict -> obj
         when loading data from DB
         """
-        product = cls(
-            product_id=data.get('productID'),
-            name=data.get('name', ''),
-            description=data.get('description', ''),
-            price=float(data.get('price', 0)),
-            stock=int(data.get('stock', 0)),
-            tags=data.get('tags', []),
-            images=data.get('images', []),
-            available_for_sale=int(data.get('available_for_sale', 0))
-        )
-        return product
+        try:
+            # conv , str -> list for tags and imgs
+            tags = data.get('tags', '')
+            if isinstance(tags, str):
+                tags = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            elif tags is None:
+                tags = []
+            
+        
+            images = data.get('images', '')
+            if isinstance(images, str):
+                images = [img.strip() for img in images.split(',') if img.strip()]
+            elif images is None:
+                images = []
+            
+            product = cls(
+                product_id=data.get('productID'),
+                name=data.get('name', ''),
+                description=data.get('description', ''),
+                price=float(data.get('price', 0)),
+                stock=int(data.get('stock', 0)),
+                tags=tags,
+                images=images,
+                available_for_sale=int(data.get('available_for_sale', 0))
+            )
+            
+            
+            if 'createdDate' in data and data['createdDate']:
+                if isinstance(data['createdDate'], str):
+                    product.created_date = datetime.fromisoformat(data['createdDate'])
+                else:
+                    product.created_date = data['createdDate']
+            
+            return product
+            
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Error converting data to Product object: {str(e)}")
 
     def update_available_for_sale(self, quantity: int):
         """Reduce available_for_sale when items added to trolley"""
@@ -62,6 +87,10 @@ class Product:
             self.available_for_sale -= quantity
             return True
         return False
+    
+    def increase_available_for_sale(self, quantity: int):
+        """Increase available_for_sale when items removed from trolley"""
+        self.available_for_sale += quantity
     
     def is_in_stock(self) -> bool:
         """Check if product is in stock and available for sale."""
