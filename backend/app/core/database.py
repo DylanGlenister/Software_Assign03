@@ -4,6 +4,8 @@ from typing import Any, Generator
 
 import mariadb
 
+from fastapi import HTTPException, status
+
 from ..utils.settings import SETTINGS
 
 # TODO: Currently _execute can return 3 types, dependent on parameters. This fuckery trickles to all code that uses this function.
@@ -42,8 +44,8 @@ class Database:
 		"""
 		if cls.__pool:
 			return
-
 		try:
+			print(cls.__pool)
 			cls.__pool = mariadb.ConnectionPool(
 				pool_name='mypool',
 				pool_size=5,
@@ -55,7 +57,19 @@ class Database:
 			)
 			print('Connection pool created successfully')
 		except mariadb.Error as e:
-			print(f'Error creating connection pool: {e}')
+			print(f"Error creating connection pool: {e}")
+			error_message_lower = str(e).lower()
+			is_access_denied = "access denied" in error_message_lower or (hasattr(e, 'errno') and e.errno == 1045)
+
+			if is_access_denied:
+				detail_message = f"Database pool initialization failed: Access Denied. Check credentials. (Error: {e})"
+			else:
+				detail_message = f"Database pool initialization failed: {e}"
+
+			raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=detail_message
+            )
 
 	@classmethod
 	def get_connection(cls) -> mariadb.Connection:
@@ -67,8 +81,17 @@ class Database:
 		"""
 		if not cls.__pool:
 			cls.initialize_pool()
-		assert cls.__pool is not None
-		return cls.__pool.get_connection()
+
+		try:
+			assert cls.__pool is not None
+			return cls.__pool.get_connection()
+		except mariadb.Error as e:
+			print(f"Error getting connection from pool: {e}")
+
+			raise HTTPException(
+				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+				detail=f"Failed to get connection from database pool: {e}"
+			)
 
 	def __init__(self, _conn: mariadb.Connection, /):
 		"""
@@ -693,10 +716,29 @@ def get_db() -> Generator[Database, None, None]:
 	Yields:
 		Database instance
 	"""
-	Database.initialize_pool()
-	conn = Database.get_connection()
-	db: Database = Database(conn)
+	raw_conn = None
+	db_instance = None
+
 	try:
-		yield db
+		raw_conn = Database.get_connection()
+		db_instance = Database(conn=raw_conn)
+		yield db_instance
+	except mariadb.Error as e:
+		print(f"MariaDB error within get_db context: {e}")
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail=f"A database error occurred during the request: {e}"
+		)
+	except HTTPException:
+		raise
+
+	except Exception as e:
+		print(f"Unexpected error in get_db context: {e}")
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail=f"An unexpected error occurred: {e}"
+		)
+
 	finally:
-		db.close()
+		if db_instance:
+			db_instance.close()

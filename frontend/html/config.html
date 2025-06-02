@@ -1,0 +1,61 @@
+<div id="config" class="content-section">
+    <div class="section-header">
+        <h3>Config</h3>
+        <p>Change the API url and manage JWT tokens</p>
+    </div>
+    <div class="endpoint-card">
+        <div class="endpoint-body">
+            <div class="form-group">
+                <label for="apiBaseUrl">API Base URL</label>
+                <input type="text" id="apiBaseUrl" class="form-control" value="http://localhost:8000/api/v1/endpoints" placeholder="http://localhost:8000/api/v1/endpoints">
+            </div>
+            <button id="saveConfigBtn" class="btn btn-primary">Save Configuration</button>
+        </div>
+    </div>
+
+    <div id="tokenDetailsSection" class="endpoint-card" style="margin-top: 20px;">
+        <div class="section-header" style="border-radius: 10px 10px 0 0; display: flex; justify-content: space-between; align-items: center;">
+            <h4>Current Token Information</h4>
+            <button id="fetchTokenDetailsBtn" class="btn btn-primary btn-sm" style="margin-left: 10px;">Refresh Details</button> 
+        </div>
+        
+        <div class="endpoint-body">
+            <div id="tokenInfoMessage" class="form-group" style="display: none; text-align: center; padding: 10px; background-color: #f8f9fa; border-radius: 6px;">
+                <p style="margin:0;">Please login to view token details.</p>
+            </div>
+
+            <div id="actualTokenData" style="display:none;">
+                <div id="currentToken" class="token-display" style="margin-bottom: 15px;">
+                    <strong>Current Raw Token:</strong>
+                    <div id="tokenValue" style="word-break: break-all;"></div>
+                    <button id="clearTokenBtn" class="btn btn-secondary btn-sm" style="margin-top: 10px;">Clear Token</button>
+                </div>
+                <div class="form-group">
+                    <label>Account ID:</label>
+                    <p id="tokenAccountId">-</p>
+                </div>
+                <div class="form-group">
+                    <label>Email:</label>
+                    <p id="tokenEmail">-</p>
+                </div>
+                <div class="form-group">
+                    <label>Role ID:</label>
+                    <p id="tokenRoleId">-</p>
+                </div>
+                <div class="form-group">
+                    <label>Status ID:</label>
+                    <p id="tokenStatusId">-</p>
+                </div>
+                <div class="form-group">
+                    <label>Time Remaining:</label>
+                    <p id="tokenTimeRemaining" style="font-weight: bold;">-</p>
+                </div>
+                <div class="form-group">
+                    <label>Expires At:</label>
+                    <p id="tokenExpiresAt">-</p>
+                </div>
+            </div>
+            <div id="tokenDetailsError" class="error" style="display: none; margin-top:10px;"></div>
+        </div>
+    </div>
+</div>

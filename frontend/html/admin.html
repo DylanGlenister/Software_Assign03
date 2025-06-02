@@ -1,0 +1,154 @@
+<div id="admin" class="content-section">
+    <div class="section-header">
+        <h3>Admin Routes</h3>
+        <p>Administrative functions requiring admin privileges</p>
+    </div>
+
+    <!-- Create Account -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">POST</span>
+            <span>/admin/createAccount</span>
+            <p class="endpoint-description">
+                <strong>MUST BE LOGGED IN AS ADMIN TO USE</strong><br>
+                Allows admins to create an account with any role. This includes creating employees or other admins. <br>
+                The password field would be set as a html password type to hide the characters inputed but for demo purposes just a text field.
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <div class="fake-data-section">
+                <h4>Sample Data</h4>
+                <button id="fillLoginCustomerBtn" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">Customer</button>
+                <button id="fillLoginAdminBtn" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">Admin</button>
+                <button id="fillLoginEmployeeBtn" class="btn btn-secondary btn-sm" style="margin-bottom: 5px;">Employee</button>
+            </div>
+            
+            <form id="createAccountForm">
+                <div class="form-group">
+                    <label for="createAccountEmail">Email</label>
+                    <input type="email" id="createAccountEmail" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="createAccountPassword">Password (min 8 characters)</label>
+                    <input type="password" id="createAccountPassword" class="form-control" minlength="8" required>
+                </div>
+                <div class="form-group">
+                    <label for="createAccountRole">Role ID</label>
+                    <select id="createAccountRole" class="form-control" required>
+                        <option value="">Select role</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Account</button>
+            </form>
+            <div id="createAccountResponse" class="response-container" style="display: none;">
+                <h4>Response:</h4>
+                <div class="response-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Others Password -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-put">PUT</span>
+            <span>/admin/changeOthersPassword</span>
+            <p class="endpoint-description">
+                <strong>MUST BE LOGGED IN AS ADMIN TO USE</strong><br>
+                Allows admins to change other account's passwords. <br>
+                The password field would be set as a html password type to hide the characters inputed but for demo purposes just a text field.
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <form id="changeOthersPasswordForm">
+                <div class="form-group">
+                    <label for="targetAccountId">Account ID</label>
+                    <select id="targetAccountId" class="form-control" required>
+                        <option value="">Select account</option>
+                </select>
+                </div>
+                <div class="form-group">
+                    <label for="othersNewPassword">New Password (min 8 characters)</label>
+                    <input type="text" id="othersNewPassword" class="form-control" minlength="8" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Change Password</button>
+            </form>
+            <div id="changeOthersPasswordResponse" class="response-container" style="display: none;">
+                <h4>Response:</h4>
+                <div class="response-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deactivate Account -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-put">PUT</span>
+            <span>/admin/deactivateAccount</span>
+            <p class="endpoint-description">
+                <strong>MUST BE LOGGED IN AS ADMIN TO USE</strong><br>
+                Allows admins to archive accounts, meaning they cannot be logged into. <br>
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <form id="deactivateAccountForm">
+                <div class="form-group">
+                    <label for="deactivateAccountId">Account ID</label>
+                    <select id="deactivateAccountId" class="form-control" required>
+                        <option value="">Select account</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Deactivate Account</button>
+            </form>
+            <div id="deactivateAccountResponse" class="response-container" style="display: none;">
+                <h4>Response:</h4>
+                <div class="response-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Account -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-delete">DELETE</span>
+            <span>/admin/deleteAccount</span>
+            <p class="endpoint-description">
+                <strong>MUST BE LOGGED IN AS ADMIN TO USE</strong><br>
+                Allows admins to delete accounts. <br>
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <form id="deleteAccountForm">
+                <div class="form-group">
+                    <label for="deleteAccountId">Account ID</label>
+                    <select id="deleteAccountId" class="form-control" required>
+                        <option value="">Select account</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Delete Account</button>
+            </form>
+            <div id="deleteAccountResponse" class="response-container" style="display: none;">
+                <h4>Response:</h4>
+                <div class="response-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Get All Accounts -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/admin/accounts</span>
+            <p class="endpoint-description">
+                <strong>MUST BE LOGGED IN AS ADMIN TO USE</strong><br>
+                Returns a list of all the accounts in the system. <br>
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <button id="getAllAccountsBtn" class="btn btn-primary">Get All Accounts</button>
+            <div id="getAllAccountsResponse" class="response-container" style="display: none;">
+                <h4>Response:</h4>
+                <div class="response-content"></div>
+            </div>
+        </div>
+    </div>
+</div>
