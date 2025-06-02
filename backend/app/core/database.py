@@ -22,7 +22,6 @@ class Database:
 				database=SETTINGS.database
 			)
 			print("Connection pool created successfully")
-			print(cls.__pool)
 		except mariadb.Error as e:
 			print(f"Error creating connection pool: {e}")
 
@@ -31,7 +30,6 @@ class Database:
 		print(cls.__pool)
 		if not cls.__pool:
 			cls.initialize_pool()
-			print(cls.__pool)
 		return cls.__pool.get_connection()
 
 	def __init__(self, conn: mariadb.Connection):
@@ -97,12 +95,12 @@ class Database:
 			return None
 
 
-	def create_account(self, email: str, password: str, creation_date: datetime, roleID: int = 1, statusID: int = 1) -> Optional[int]:
+	def create_account(self, email: str, password: str, creation_date: datetime, role_ID: int = 1, status_ID: int = 1) -> Optional[int]:
 		query = """
 			INSERT INTO accounts (email, password, creationDate, roleID, statusID)
 			VALUES (?, ?, ?, ?, ?)
 		"""
-		params = (email, password, creation_date, roleID, statusID)
+		params = (email, password, creation_date, role_ID, status_ID)
 		return self._execute(query, params, return_last_id=True)
 
 	def role_exists(self, role_id: int) -> bool:
@@ -205,6 +203,13 @@ class Database:
 			FROM accounts
 		"""
 		return self._fetch_all(query)
+
+	def delete_old_accounts_by_role(self, role_ID: int, before_date: str) -> int:
+		query = """
+			DELETE FROM accounts
+			WHERE roleID = %s AND creationDate < %s
+		"""
+		return self._execute(query, (role_ID, before_date))
 
 
 def get_db() -> Generator[Database, None, None]:

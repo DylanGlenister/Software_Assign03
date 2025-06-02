@@ -4,12 +4,15 @@ from pydantic import BaseModel, EmailStr, constr
 from datetime import datetime, timezone
 
 from ..models.account import Account
-from ..models.customer import CustomerAccount
 from .database import Database, get_db
 from ..utils.settings import SETTINGS
-from ..utils.token import create_access_token, decode_access_token, get_current_account, get_token_from_header
+from ..utils.token import create_token, decode_token, get_account_data, get_token, TokenData
 
 account_route = APIRouter(prefix=SETTINGS.api_path + "/accounts", tags=["accounts"])
+
+def get_account(account_data: dict = Depends(get_account_data)) -> Account:
+    return Account(**account_data)
+     
 
 class LoginPayload(BaseModel):
 	email: EmailStr = "customer@example.com"
@@ -26,7 +29,7 @@ def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
 		return {"message": "This account is inactive"}
 
 	if account:
-		token: str = create_access_token({"email": account.email, "role_ID": account.role_ID, "account_ID": account.account_ID})
+		token: str = create_token({"email": account.email, "role_ID": account.role_ID, "account_ID": account.account_ID, "status_ID": account.status_ID})
 		return {
 			"message": "Login successful", 
 			"email": account.email,
@@ -37,23 +40,26 @@ def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
 			}
 
 @account_route.post("/tokenInfo")
-def token_info(token: str = Depends(get_token_from_header)):
-    token_data: dict = decode_access_token(token)
+def token_info(token: str = Depends(get_token)):
+    token_data: TokenData = decode_token(token)
     if not token_data:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    exp_timestamp: float = token_data.get("exp")
-    if not exp_timestamp:
-        raise HTTPException(status_code=400, detail="Token does not contain expiration")
+    if not token_data.exp:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token does not contain expiration"
+        )
 
-    expire_time: datetime = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
-    now: datetime = datetime.now(timezone.utc)
-    time_remaining: datetime = expire_time - now
+    expire_time = datetime.fromtimestamp(token_data.exp, tz=timezone.utc)
+    now = datetime.now(timezone.utc)
+    time_remaining = expire_time - now
 
     return {
         "expires_at": expire_time.isoformat(),
         "time_remaining": str(time_remaining),
-		"data": token_data
+        "time_remaining_seconds": time_remaining.total_seconds(),
+        "data": token_data.model_dump()
     }
 
 class UpdateAccountPayload(BaseModel):
@@ -61,7 +67,9 @@ class UpdateAccountPayload(BaseModel):
     status_ID: Optional[int] = 1
 
 @account_route.put("/update")
-def update_account(payload: UpdateAccountPayload, account: Account = Depends(get_current_account), db: Database = Depends(get_db)):
+def update_account(payload: UpdateAccountPayload, account: Account = Depends(get_account), db: Database = Depends(get_db)):
+    account.verify_perms(db, [1,2,3]) # Dont allow guests to update their account
+
     result = account.update_info(db, **payload.model_dump(exclude_unset=True))
     if isinstance(result, dict) and result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
@@ -70,8 +78,10 @@ def update_account(payload: UpdateAccountPayload, account: Account = Depends(get
 class ChangePasswordPayload(BaseModel):
     new_password: constr(min_length=8)
 
-@account_route.put("/change-password")
-def change_password(payload: ChangePasswordPayload, account: Account = Depends(get_current_account), db: Database = Depends(get_db)):
+@account_route.put("/changePassword")
+def change_password(payload: ChangePasswordPayload, account: Account = Depends(get_account), db: Database = Depends(get_db)):
+    account.verify_perms(db, [1,2,3]) # Dont allow guests to update their password
+
     result = account.change_password(db, payload.new_password)
     if isinstance(result, dict) and result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])

@@ -1,7 +1,6 @@
-from typing import Optional, Type, Tuple
+from typing import Optional, Type
 from pydantic import EmailStr, ValidationError
 from bcrypt import checkpw, gensalt, hashpw
-from datetime import datetime
 
 from ..core.database import Database
 
@@ -21,9 +20,9 @@ class Account:
 		return hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 	@classmethod
-	def login(cls: Type["Account"], db: Database, email: str, password: str) -> Optional["Account"]:
+	def login(cls: Type["Account"], db: Database, email: EmailStr, password: str) -> Optional["Account"]:
 		"""Attempt to find an account with matching email and password."""
-		row: Tuple = db.get_account(email=email)
+		row: tuple = db.get_account(email=email)
 		if not row:
 			print("No account found with that email.")
 			return None

@@ -5,15 +5,16 @@ from pydantic import BaseModel, EmailStr, constr
 from ..models.admin import AdminAccount
 from ..models.account import Account
 from ..core.database import Database, get_db
-from ..utils.token import get_current_account
+from ..utils.token import get_account_data
 from ..utils.settings import SETTINGS
 
 admin_route = APIRouter(prefix=SETTINGS.api_path + "/admin", tags=["admin"])
 
-def get_admin_account(account: Account = Depends(get_current_account)) -> AdminAccount:
+def get_admin_account(account_data: dict = Depends(get_account_data)) -> AdminAccount:
+    account = AdminAccount(**account_data)
     if account.role_ID != 1:
         raise HTTPException(status_code=403, detail="Admin access required")
-    return AdminAccount(**account.__dict__)
+    return account
 
 class AdminCreateAccountPayload(BaseModel):
     email: EmailStr
@@ -29,6 +30,10 @@ class DeactivateAccountPayload(BaseModel):
 
 class DeleteAccountPayload(BaseModel):
     account_ID: int
+
+class DeleteOldAccountsPayload(BaseModel):
+    role_ID: int = 4
+    days_old: int = 30
 
 @admin_route.post("/createAccount")
 def create_account_route(payload: AdminCreateAccountPayload, db: Database = Depends(get_db), admin: AdminAccount = Depends(get_admin_account)):
@@ -61,3 +66,7 @@ def delete_account_route(payload: DeleteAccountPayload, db: Database = Depends(g
 @admin_route.get("/accounts")
 def get_all_accounts_route(db: Database = Depends(get_db), admin: AdminAccount = Depends(get_admin_account)):
     return {"accounts": admin.get_all_accounts(db)}
+
+@admin_route.delete("/deleteOldAccounts")
+def delete_old_accounts_route(payload: DeleteOldAccountsPayload, db: Database = Depends(get_db), admin: AdminAccount = Depends(get_admin_account)):
+    return admin.delete_old_accounts_by_role(db, payload.days_old, payload.role_ID)

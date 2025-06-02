@@ -1,49 +1,85 @@
 from datetime import datetime, timedelta, timezone
-from fastapi import Depends, Header, status, HTTPException
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
+from typing import Optional
+from pydantic import BaseModel
 
-from ..models.customer import CustomerAccount
-from ..models.account import Account
 from ..core.database import get_db, Database
 from .settings import SETTINGS
 
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
-def create_access_token(data: dict, expires_in_mins: int = None):
-    to_encode: dict = data.copy()
-    time: int = expires_in_mins if expires_in_mins else SETTINGS.access_token_expire_minutes
+class TokenData(BaseModel):
+    account_ID: int
+    email: str
+    role_ID: int = 1
+    status_ID: int = 1
+    exp: Optional[int] = None
 
-    expire: datetime = datetime.now(timezone.utc) + timedelta(minutes=time)
-    to_encode.update({"exp": expire})
-    encoded_jwt: str = jwt.encode(to_encode, SETTINGS.secret_key, algorithm=SETTINGS.algorithm)
-    if isinstance(encoded_jwt, bytes):
-        encoded_jwt = encoded_jwt.decode('utf-8')
-    return encoded_jwt
+def create_token( data: dict, expires_in: int = SETTINGS.access_token_expire_minutes, 
+                 secret_key: str = SETTINGS.secret_key, algorithm: str = SETTINGS.algorithm) -> str:
+    """Create a JWT token with the given data and expiration."""
+    payload = data.copy()
+    expire_time = datetime.now(timezone.utc) + timedelta(minutes=expires_in)
+    payload["exp"] = int(expire_time.timestamp()) 
+    
+    encoded = jwt.encode(payload, secret_key, algorithm=algorithm)
+    return encoded if isinstance(encoded, str) else encoded.decode('utf-8')
 
-def decode_access_token(token: str):
+def decode_token(token: str, secret_key: str = SETTINGS.secret_key, algorithm: str = SETTINGS.algorithm) -> Optional[TokenData]:
+    """Decode and validate a JWT token."""
     try:
-        return jwt.decode(token, SETTINGS.secret_key, algorithms=[SETTINGS.algorithm])
-    except jwt.ExpiredSignatureError:
+        payload = jwt.decode(token, secret_key, algorithms=[algorithm])
+        return TokenData(**payload)
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
         return None
-    except jwt.InvalidTokenError:
-        return None
 
-def get_token_from_header(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> str:
-    return credentials.credentials
+def get_token(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> Optional[str]:
+    """
+    Gets the JWT token from the authorization headers.
+    """
+    if credentials:
+        return credentials.credentials
+    return None
 
-def get_customer_from_token(token: str = Depends(get_token_from_header)) -> CustomerAccount:
-    data = decode_access_token(token)
-    if not data or "account_ID" not in data:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    return CustomerAccount(data["account_ID"], data["email"], "", None, 1, 1)
+def get_secure_token(credentials: HTTPAuthorizationCredentials = Depends(get_token)) -> str:
+    """
+    Gets the JWT token from the authorization headers, throwing an error if its missing.
+    """
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header required"
+        )
+    
+    return credentials
 
-def get_current_account(token: str = Depends(get_token_from_header), db: Database = Depends(get_db)) -> Account:
-    payload = decode_access_token(token)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    account_id = payload.get("account_ID")
-    row = db.get_account(account_id=account_id)
-    if not row:
-        raise HTTPException(status_code=404, detail="Account not found")
-    return Account(*row)
+def get_account_data(token: str = Depends(get_secure_token), db: Database = Depends(get_db)) -> dict:
+    """
+    Validate token and get full account details from database.
+    """
+    token_data = decode_token(token)
+    if not token_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token"
+        )
+    
+    account_data: tuple = db.get_account(account_id=token_data.account_ID)
+    if not account_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found"
+        )
+        
+    account_dict: dict = {
+        "account_ID": account_data[0],
+        "email": account_data[1],
+        "password": account_data[2],
+        "creation_date": account_data[3],
+        "role_ID": account_data[4],
+        "status_ID": account_data[5]
+    }
+    
+    return account_dict
