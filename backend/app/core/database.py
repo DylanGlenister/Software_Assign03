@@ -721,7 +721,7 @@ def get_db() -> Generator[Database, None, None]:
 
 	try:
 		raw_conn = Database.get_connection()
-		db_instance = Database(conn=raw_conn)
+		db_instance = Database(raw_conn)
 		yield db_instance
 	except mariadb.Error as e:
 		print(f"MariaDB error within get_db context: {e}")
