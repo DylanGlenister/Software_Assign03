@@ -3,7 +3,6 @@ from enum import Enum
 from typing import Any, Generator
 
 import mariadb
-
 from fastapi import HTTPException, status
 
 from ..utils.settings import SETTINGS
@@ -23,7 +22,7 @@ class Role(Enum):
 
 class Status(Enum):
 	"""
-	Account status enumeration.
+	Account status. Condemned accounts are to be deleted.
 	"""
 	UNVERIFIED = 'unverified'
 	ACTIVE = 'active'
@@ -318,11 +317,19 @@ class Database:
 		if _creationDate is None:
 			_creationDate = datetime.now()
 
-		query = '''
-			INSERT INTO Account (email, password, firstname, lastname, creationDate, role)
-			VALUES (%s, %s, %s, %s, %s, %s)
-		'''
-		params = (_email, _password, _firstName, _lastName, _creationDate, _role.value)
+		if _firstName is not None and _lastName is not None:
+			query = '''
+				INSERT INTO Account (email, password, firstname, lastname, creationDate, role)
+				VALUES (%s, %s, %s, %s, %s, %s)
+			'''
+			params = (_email, _password, _firstName, _lastName, _creationDate, _role.value)
+		else:
+			query = '''
+				INSERT INTO Account (email, password, creationDate, role)
+				VALUES (%s, %s, %s, %s)
+			'''
+			params = (_email, _password, _creationDate, _role.value)
+
 		return self._execute(query, params, _returnLastId=True)
 
 	# NOTE Using dictonary args might be a bit fucky but it seems the best for the case.
@@ -346,6 +353,7 @@ class Database:
 		query = f'UPDATE Account SET {set_clause} WHERE accountID = %s'
 		return self._execute(query, params)
 
+	# NOTE This currently does not work as the database constraints prevent it
 	def delete_account(self, _accountId: int, /) -> bool | int | None:
 		"""
 		Delete an account from the database.
@@ -395,6 +403,7 @@ class Database:
 		'''
 		return self._fetch_all(query, (_accountId,))
 
+	# NOTE This currently does not work as the database constraints prevent it
 	def delete_address(self, _addressId: int, /) -> bool | int | None:
 		"""
 		Delete an address.
@@ -723,12 +732,14 @@ def get_db() -> Generator[Database, None, None]:
 		raw_conn = Database.get_connection()
 		db_instance = Database(raw_conn)
 		yield db_instance
+
 	except mariadb.Error as e:
 		print(f"MariaDB error within get_db context: {e}")
 		raise HTTPException(
 			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 			detail=f"A database error occurred during the request: {e}"
 		)
+
 	except HTTPException:
 		raise
 
