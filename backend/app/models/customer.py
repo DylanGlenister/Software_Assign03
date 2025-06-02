@@ -15,13 +15,13 @@ class CustomerAccount(Account):
         existing: tuple = db.get_account(email=email)
         if existing:
             return {"error": "An account with that email already exists"}
-        
+
         if len(password) < 8:
             return {"error": "Password must be at least 8 characters long."}
-        
+
         if not any(char.isupper() for char in password):
             return {"error": "Password must contain at least one uppercase letter."}
-        
+
         if not db.role_exists(role_ID):
             return {"error": "Invalid role ID."}
 
@@ -50,17 +50,17 @@ class CustomerAccount(Account):
         return {"account": cls(account_ID, guest_email, "", creation_date, role_ID = 4, status_ID = 3)}
 
     def get_trolly(self, db: Database):
-        return db.get_trolly(self.account_ID)
+        return db.get_trolley(self.account_ID)
 
     def add_to_trolly(self, db: Database, product_id: int, amount: int):
-        return db.add_to_trolly(self.account_ID, product_id, amount)
+        return db.add_to_trolley(self.account_ID, product_id, amount)
 
     def remove_from_trolly(self, db: Database, product_id: int, amount: int):
-        return db.remove_from_trolly(self.account_ID, product_id, amount)
+        return db.remove_from_trolley(self.account_ID, product_id, amount)
 
     def clear_trolly(self, db: Database):
-        return db.clear_trolly(self.account_ID)
-    
+        return db.clear_trolley(self.account_ID)
+
     def create_order(self, db: Database, order_manager):
         trolly: list[tuple] = self.get_trolly(db)
 

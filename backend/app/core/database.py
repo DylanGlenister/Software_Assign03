@@ -143,7 +143,7 @@ class Database:
 		query: str = 'SELECT * FROM test'
 		return self._fetch_all(query)
 
-	def get_trolly(self, account_id: int):
+	def get_trolley(self, account_id: int):
 		query = '''
 			SELECT productID, amount
 			FROM trolleys
@@ -151,7 +151,7 @@ class Database:
 		'''
 		return self._fetch_all(query, (account_id,))
 
-	def add_to_trolly(self, account_id: int, product_id: int, amount: int = 1):
+	def add_to_trolley(self, account_id: int, product_id: int, amount: int = 1):
 		select_query = '''
 			SELECT amount FROM trolleys
 			WHERE customerID = ? AND productID = ?
@@ -171,7 +171,7 @@ class Database:
 			'''
 			return self._execute(insert_query, (account_id, product_id, amount))
 
-	def remove_from_trolly(self, account_id: int, product_id: int, amount: int = 1):
+	def remove_from_trolley(self, account_id: int, product_id: int, amount: int = 1):
 		select_query = '''
 			SELECT amount FROM trolleys
 			WHERE customerID = ? AND productID = ?
@@ -195,7 +195,7 @@ class Database:
 			'''
 			return self._execute(update_query, (new_amount, account_id, product_id))
 
-	def clear_trolly(self, account_id: int):
+	def clear_trolley(self, account_id: int):
 		delete_all_query = '''
 			DELETE FROM trolleys
 			WHERE customerID = ?
