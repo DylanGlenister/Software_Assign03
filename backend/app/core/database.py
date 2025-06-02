@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 
 from ..utils.settings import SETTINGS
 
-# TODO: Currently _execute can return 3 types, dependent on parameters. This fuckery trickles to all code that uses this function.
+# TODO Currently _execute can return 3 types, dependent on parameters. This fuckery trickles to all code that uses this function.
 
 class Role(Enum):
 	"""
