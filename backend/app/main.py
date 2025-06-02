@@ -79,15 +79,15 @@ async def base_api():
 @app.get(SETTINGS.api_path + '/test/sql')
 async def test_sql(db: Database = Depends(get_db)):
 	'''Test a SQL SELECT query from the test table.'''
-	result = db.test_select()
+	#result = db.test_select()
 
-	output = [f'id: {id}, value: {value}' for (id, value) in result]
+	#output = [f'id: {id}, value: {value}' for (id, value) in result]
 
-	return {
-		'Result': {
-			'Output': output
-		}
-	}
+	#return {
+	#	'Result': {
+	#		'Output': output
+	#	}
+	#}
 
 @app.get("/secure-example", dependencies=[Depends(bearer_scheme)])
 def secure_example():
