@@ -48,13 +48,13 @@ CREATE TABLE `Product` (
 
 CREATE TABLE `Account` (
 	`accountID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	`role` enum('owner', 'admin', 'employee', 'customer', 'guest') NOT NULL,
-	`status` enum('active', 'inactive', 'deactive') NOT NULL,
-	`firstname` VARCHAR(50) DEFAULT NULL,
-	`lastname` VARCHAR(50) DEFAULT NULL,
 	`email` VARCHAR(100) NOT NULL,
 	`password` VARCHAR(100) NOT NULL,
-	`creationDate` DATETIME NOT NULL
+	`firstname` VARCHAR(50) DEFAULT NULL,
+	`lastname` VARCHAR(50) DEFAULT NULL,
+	`creationDate` DATETIME NOT NULL,
+	`role` enum('owner', 'admin', 'employee', 'customer', 'guest') NOT NULL DEFAULT 'guest',
+	`status` enum('unverified', 'active', 'inactive', 'condemned') NOT NULL DEFAULT 'unverified'
 ) ENGINE=InnoDB;
 
 CREATE TABLE `Address` (
