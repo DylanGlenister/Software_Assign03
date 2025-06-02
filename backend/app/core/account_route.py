@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from typing import Optional
 from pydantic import BaseModel, EmailStr, constr
-from datetime import datetime, timezone
 
 from ..models.account import Account
 from .database import Database, get_db
 from ..utils.settings import SETTINGS
-from ..utils.token import create_token, decode_token, get_account_data, get_token, TokenData
+from ..utils.token import create_token, get_account_data
 
 account_route = APIRouter(prefix=SETTINGS.api_path + "/accounts", tags=["accounts"])
 
@@ -38,29 +37,6 @@ def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
 				"token_type": "bearer"
 				}
 			}
-
-@account_route.post("/tokenInfo")
-def token_info(token: str = Depends(get_token)):
-    token_data: TokenData = decode_token(token)
-    if not token_data:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    if not token_data.exp:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Token does not contain expiration"
-        )
-
-    expire_time = datetime.fromtimestamp(token_data.exp, tz=timezone.utc)
-    now = datetime.now(timezone.utc)
-    time_remaining = expire_time - now
-
-    return {
-        "expires_at": expire_time.isoformat(),
-        "time_remaining": str(time_remaining),
-        "time_remaining_seconds": time_remaining.total_seconds(),
-        "data": token_data.model_dump()
-    }
 
 class UpdateAccountPayload(BaseModel):
     email: Optional[EmailStr]

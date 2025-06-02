@@ -65,7 +65,9 @@ def delete_account_route(payload: DeleteAccountPayload, db: Database = Depends(g
 
 @admin_route.get("/accounts")
 def get_all_accounts_route(db: Database = Depends(get_db), admin: AdminAccount = Depends(get_admin_account)):
-    return {"accounts": admin.get_all_accounts(db)}
+    accounts = admin.get_all_accounts(db)
+    formatted = [{"id": account, "name": name, "role_ID": role, "status_ID": status, "creation_date": date} for account, name, role, status, date in accounts]
+    return {"accounts": formatted}
 
 @admin_route.delete("/deleteOldAccounts")
 def delete_old_accounts_route(payload: DeleteOldAccountsPayload, db: Database = Depends(get_db), admin: AdminAccount = Depends(get_admin_account)):

@@ -1,6 +1,8 @@
 import mariadb
 from typing import Generator, Any, List, Optional, Tuple
 from datetime import datetime
+from fastapi import HTTPException, status
+
 from ..utils.settings import SETTINGS
 
 class Database:
@@ -10,8 +12,8 @@ class Database:
 	def initialize_pool(cls):
 		if cls.__pool:
 			return
-
 		try:
+			print(cls.__pool)
 			cls.__pool = mariadb.ConnectionPool(
 				pool_name="mypool",
 				pool_size=5,
@@ -24,14 +26,34 @@ class Database:
 			print("Connection pool created successfully")
 		except mariadb.Error as e:
 			print(f"Error creating connection pool: {e}")
+			error_message_lower = str(e).lower()
+			is_access_denied = "access denied" in error_message_lower or (hasattr(e, 'errno') and e.errno == 1045)
+			
+			if is_access_denied:
+				detail_message = f"Database pool initialization failed: Access Denied. Check credentials. (Error: {e})"
+			else:
+				detail_message = f"Database pool initialization failed: {e}"
+
+			raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=detail_message
+            )
 
 	@classmethod
 	def get_connection(cls):
-		print(cls.__pool)
 		if not cls.__pool:
 			cls.initialize_pool()
-		return cls.__pool.get_connection()
+	
+		try:
+			return cls.__pool.get_connection()
+		except mariadb.Error as e:
+			print(f"Error getting connection from pool: {e}")
 
+			raise HTTPException(
+				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+				detail=f"Failed to get connection from database pool: {e}"
+			)
+		
 	def __init__(self, conn: mariadb.Connection):
 		self.conn: mariadb.Connection = conn
 		self.cur: mariadb.Cursor = conn.cursor()
@@ -210,13 +232,46 @@ class Database:
 			WHERE roleID = %s AND creationDate < %s
 		"""
 		return self._execute(query, (role_ID, before_date))
+	
+	def get_roles(self):
+		query = """
+			SELECT *
+			FROM roles
+		"""
+		return self._fetch_all(query)
+
+	def get_statuses(self):
+		query = """
+			SELECT *
+			FROM status
+		"""
+		return self._fetch_all(query)
 
 
 def get_db() -> Generator[Database, None, None]:
-	Database.initialize_pool()
-	conn = Database.get_connection()
-	db: Database = Database(conn)
+	raw_conn = None
+	db_instance = None
+
 	try:
-		yield db
+		raw_conn = Database.get_connection()
+		db_instance = Database(conn=raw_conn)
+		yield db_instance
+	except mariadb.Error as e:
+		print(f"MariaDB error within get_db context: {e}")
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail=f"A database error occurred during the request: {e}"
+		)
+	except HTTPException:
+		raise
+
+	except Exception as e:
+		print(f"Unexpected error in get_db context: {e}")
+		raise HTTPException(
+			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			detail=f"An unexpected error occurred: {e}"
+		)
+	
 	finally:
-		db.close()
+		if db_instance:
+			db_instance.close()

@@ -16,5 +16,9 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = 'utf-8'
+    
+    def reload_settings(self):
+        global SETTINGS
+        SETTINGS = Settings()
 
 SETTINGS = Settings()
