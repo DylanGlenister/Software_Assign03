@@ -8,17 +8,22 @@ from ..utils.settings import SETTINGS
 
 
 class Role(Enum):
-	'owner'
-	'admin'
-	'employee'
-	'customer'
-	'guest'
+	"""
+	Accounts all have a role that dictates what they can and cannot do.
+	(These may be innaccurate I don't remember what roles we chose.)
+	"""
+	OWNER = 'owner'
+	ADMIN = 'admin'
+	EMPLOYEE = 'employee'
+	CUSTOMER = 'customer'
+	GUEST = 'guest'
 
 
 class Status(Enum):
-	'active'
-	'inactive'
-	'deactive'
+	UNVERIFIED = 'unverified'
+	ACTIVE = 'active'
+	INACTIVE = 'inactive'
+	CONDEMNED = 'condemned'
 
 
 class Database:
@@ -26,6 +31,9 @@ class Database:
 
 	@classmethod
 	def initialize_pool(cls):
+		"""
+		Create a pooling object. Pooling allows more efficient accessing of the database.
+		"""
 		if cls.__pool:
 			return
 
@@ -44,7 +52,10 @@ class Database:
 			print(f'Error creating connection pool: {e}')
 
 	@classmethod
-	def get_connection(cls):
+	def get_connection(cls) -> mariadb.Connection:
+		"""
+
+		"""
 		print(cls.__pool)
 		if not cls.__pool:
 			cls.initialize_pool()
@@ -67,63 +78,180 @@ class Database:
 
 	# --- Internal query helpers ---
 
-	def _fetch_one(self, _query: str, _params: tuple = ()):
+	def _fetch_one(self, _query: str, _params: tuple = (), /) -> dict | None:
+		"""
+		Execute a query and return a single row as a dictionary.
+
+		Args:
+			_query: SQL query string
+			_params: Query parameters
+
+		Returns:
+			Single row as dict or None if no results/error
+		"""
 		try:
 			self.cur.execute(_query, _params)
-			return self.cur.fetchone()
+			row = self.cur.fetchone()
+
+			if row is None:
+				return None
+
+			# Convert to dictionary using column descriptions
+			columns = [desc[0] for desc in self.cur.description]
+			return dict(zip(columns, row))
+
 		except mariadb.Error as e:
 			print(f'DB error in fetchone: {e}')
 			return None
+		except Exception as e:
+			print(f'Unexpected error in fetchone: {e}')
+			return None
 
-	def _fetch_all(self, _query: str, _params: tuple = ()):
+	def _fetch_all(self, _query: str, _params: tuple = (), /) -> list[dict] | None:
+		"""
+		Execute a query and return all rows as a list of dictionaries.
+
+		Args:
+			_query: SQL query string
+			_params: Query parameters
+
+		Returns:
+			List of rows as dictionaries or None if no results/error
+		"""
 		try:
 			self.cur.execute(_query, _params)
-			return self.cur.fetchall()
+			rows = self.cur.fetchall()
+
+			if not rows:
+				return None
+
+			# Convert to list of dictionaries using column descriptions
+			columns = [desc[0] for desc in self.cur.description]
+			return [dict(zip(columns, row)) for row in rows]
+
 		except mariadb.Error as e:
 			print(f'DB error in fetchall: {e}')
-			return []
+			return None
+		except Exception as e:
+			print(f'Unexpected error in fetchall: {e}')
+			return None
 
-	def _execute(self, _query: str, _params: tuple = (), _return_last_id: bool = False):
+	def _execute(self, _query: str, _params: tuple = (), /, *, _returnLastId: bool = False) -> bool | int | None:
+		"""
+		Execute a query that modifies data (INSERT, UPDATE, DELETE).
+
+		Args:
+			_query: SQL query string
+			_params: Query parameters
+			_returnLastId: Whether to return the last inserted row ID
+
+		Returns:
+			- If _returnLastId=True: last row ID (int) or None on error
+			- If _returnLastId=False: True on success, False on error
+		"""
 		try:
 			self.cur.execute(_query, _params)
+
+			# Check if any rows were affected
+			affected_rows = self.cur.rowcount
+
 			self.commit()
-			return self.cur.lastrowid if _return_last_id else True
+
+			if _returnLastId:
+				# Only return lastrowid if rows were actually affected
+				return self.cur.lastrowid if affected_rows > 0 else None
+			else:
+				return affected_rows > 0
+
 		except mariadb.Error as e:
 			print(f'DB error in execute: {e}, rolling back')
-			self.rollback()
-			return None if _return_last_id else False
+			try:
+				self.rollback()
+			except Exception as rollback_error:
+				print(f'Error during rollback: {rollback_error}')
+
+			return None if _returnLastId else False
+
+		except Exception as e:
+			print(f'Unexpected error in execute: {e}, rolling back')
+			try:
+				self.rollback()
+			except Exception as rollback_error:
+				print(f'Error during rollback: {rollback_error}')
+
+			return None if _returnLastId else False
 
 	# --- Public API methods ---
 
-	def get_account(self, *, email: str | None = None, account_id: int | None = None):
-		if email:
-			query = '''
-				SELECT accountID, email, password, creationDate, roleID, statusID
+	def get_account(
+		self,
+		*,
+		_accountID: int | None = None,
+		_email: str | None = None
+	):
+		"""
+		Retrieve information about an account using an accessor.
+
+		Args:
+			_accountID: Mutually exclusive with other args
+			_email: Mutually exclusive with other args
+			_firstname: Mutually exclusive with other args
+
+		Returns:
+			A dictionary containing information about the account.
+		"""
+		# Count non-None arguments
+		args_num = sum(x is not None for x in [_accountID, _email])
+
+		if args_num == 0:
+			raise ValueError("Must provide exactly one of: _accountID, _email, or _firstname")
+		elif args_num > 1:
+			raise ValueError("Keyword arguments are mutually exclusive, only provide one of: _accountID, _email, or _firstname")
+
+		selector = []
+
+		if _accountID is not None:
+			selector = ['accountID', (_accountID,)]
+		elif _email is not None:
+			selector = ['email', (_email,)]
+
+		query = f'''
+				SELECT (accountID, email, password, firstname, lastname, creationDate, role, status)
 				FROM accounts
-				WHERE email = ?
+				WHERE {selector[0]} = %s
 			'''
-			return self._fetch_one(query, (email,))
-		elif account_id:
+		return self._fetch_one(query, selector[1])
+
+	def create_account(
+		self,
+		_email: str,
+		_password: str,
+		_role: Role = Role.GUEST,
+		/,
+		_firstname: str | None = None,
+		_lastname: str | None = None,
+		_creation_date: datetime = datetime.now()
+	):
+		"""
+		Create a new account on the database.
+
+		Args:
+			email: The email account for the account
+		"""
+
+		if _firstname is not None and _lastname is not None:
 			query = '''
-				SELECT accountID, email, password, creationDate, roleID, statusID
-				FROM accounts
-				WHERE accountID = ?
+				INSERT INTO accounts (email, password, firstname, lastname, creationDate, role)
+				VALUES (%s, %s, %s, %s, %s, %s)
 			'''
-			return self._fetch_one(query, (account_id,))
+			params = (_email, _password, _firstname, _lastname, _creation_date, _role)
 		else:
-			return None
-
-	def create_account(self, email: str, password: str, creation_date: datetime, role_ID: int = 1, status_ID: int = 1):
-		query = '''
-			INSERT INTO accounts (email, password, creationDate, roleID, statusID)
-			VALUES (?, ?, ?, ?, ?)
-		'''
-		params = (email, password, creation_date, role_ID, status_ID)
-		return self._execute(query, params, _return_last_id=True)
-
-	def get_role(self, role_id: int):
-		query = 'SELECT roleID, name FROM roles WHERE roleID = ?'
-		return self._fetch_one(query, (role_id,))
+			query = '''
+				INSERT INTO accounts (email, password, creationDate, role)
+				VALUES (%s, %s, %s, %s)
+			'''
+			params = (_email, _password, _creation_date, _role)
+		return self._execute(query, params, _returnLastId=True)
 
 	def update_account(self, account_id: int, **fields):
 		if not fields:
@@ -137,10 +265,6 @@ class Database:
 
 	def get_all_products(self):
 		query: str = 'SELECT * FROM products'
-		return self._fetch_all(query)
-
-	def test_select(self):
-		query: str = 'SELECT * FROM test'
 		return self._fetch_all(query)
 
 	def get_trolley(self, account_id: int):
@@ -231,7 +355,10 @@ def get_db() -> Generator[Database, None, None]:
 		db.close()
 
 def main():
-
+	Database.initialize_pool()
+	conn = Database.get_connection()
+	db: Database = Database(conn)
+	db.create_account('test@email.com', 'fuck', Role.OWNER)
 	return
 
 if __name__ == '__main__':

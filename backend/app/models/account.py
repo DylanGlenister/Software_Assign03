@@ -22,7 +22,7 @@ class Account:
 	@classmethod
 	def login(cls: Type["Account"], db: Database, email: EmailStr, password: str) -> Optional["Account"]:
 		"""Attempt to find an account with matching email and password."""
-		row: tuple = db.get_account(email=email)
+		row: tuple = db.get_account(_email=email)
 		if not row:
 			print("No account found with that email.")
 			return None

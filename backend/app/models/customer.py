@@ -12,7 +12,7 @@ class CustomerAccount(Account):
     @classmethod
     def register(cls, db: Database, email: EmailStr, password: str, role_ID: int = 1, status_ID: int = 1) -> dict:
         """Create a new account with hashed password."""
-        existing: tuple = db.get_account(email=email)
+        existing: tuple = db.get_account(_email=email)
         if existing:
             return {"error": "An account with that email already exists"}
 
@@ -43,7 +43,7 @@ class CustomerAccount(Account):
         guest_email = f"guest_{uuid4().hex[:8]}@temp.domain"
         creation_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        account_ID: int = db.create_account(guest_email, "", creation_date, role_ID = 4, status_ID = 3) #Role guest, status Temp
+        account_ID: int = db.create_account(guest_email, "", creation_date, _role = 4, status_ID = 3) #Role guest, status Temp
         if account_ID is None:
             return {"error": "An unknown issue caused account creation to fail"}
 
