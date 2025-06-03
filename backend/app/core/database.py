@@ -361,10 +361,9 @@ class Database:
 		query = f'UPDATE Account SET {set_clause} WHERE accountID = %s'
 		return self._execute(query, params)
 
-	# NOTE This currently does not work as the database constraints prevent it
 	def delete_accounts(self, _accountIds: list[int], /) -> bool | int | None:
 		"""
-		Delete accounts from the database.
+		Delete accounts from the database. Deleting an account deletes all associated addresses and the entry in the order will be set to null.
 
 		Args:
 			_accountIds: List of account IDs to delete
@@ -415,10 +414,9 @@ class Database:
 		'''
 		return self._fetch_all(query, (_accountId,))
 
-	# NOTE This currently does not work as the database constraints prevent it
 	def delete_address(self, _addressId: int, /) -> bool | int | None:
 		"""
-		Delete an address.
+		Delete an address. Generally you want to avoid doing this. Deleting an account deletes all associated addresses and the entry in the order will be set to null.
 
 		Args:
 			_addressId: Address ID to delete
