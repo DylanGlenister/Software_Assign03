@@ -57,20 +57,22 @@ CREATE TABLE `Account` (
 	`status` enum('unverified', 'active', 'inactive', 'condemned') NOT NULL DEFAULT 'unverified'
 ) ENGINE=InnoDB;
 
+# Deleting an account will automatically delete all associated addresses.
 CREATE TABLE `Address` (
 	`addressID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`accountID` INT NOT NULL,
 	`location` VARCHAR(150) NOT NULL,
-	CONSTRAINT `address_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE RESTRICT ON UPDATE RESTRICT
+	CONSTRAINT `address_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+# Deleting an account and address will not delete the order but will invalidate the foreign keys
 CREATE TABLE `Order` (
 	`orderID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	`accountID` INT NOT NULL,
-	`addressID` INT NOT NULL,
+	`accountID` INT,
+	`addressID` INT,
 	`date` DATETIME NOT NULL,
-	CONSTRAINT `order_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-	CONSTRAINT `order_FK_address` FOREIGN KEY (`addressID`) REFERENCES `Address` (`addressID`) ON DELETE RESTRICT ON UPDATE RESTRICT
+	CONSTRAINT `order_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE SET NULL,
+	CONSTRAINT `order_FK_address` FOREIGN KEY (`addressID`) REFERENCES `Address` (`addressID`) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE `LineItem` (
@@ -78,7 +80,7 @@ CREATE TABLE `LineItem` (
 	`productID` INT NOT NULL,
 	`quantity` INT NOT NULL,
 	`priceAtSale` FLOAT DEFAULT NULL,
-	CONSTRAINT `lineItem_FK_product` FOREIGN KEY (`productID`) REFERENCES `Product` (`productID`) ON DELETE RESTRICT ON UPDATE RESTRICT
+	CONSTRAINT `lineItem_FK_product` FOREIGN KEY (`productID`) REFERENCES `Product` (`productID`)
 ) ENGINE=InnoDB;
 
 # End node tables
@@ -86,30 +88,30 @@ CREATE TABLE `LineItem` (
 
 CREATE TABLE `Invoice` (
 	`invoiceID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	`accountID` INT NOT NULL,
+	`accountID` INT,
 	`orderID` INT NOT NULL,
 	`creationDate` DATETIME NOT NULL,
 	`data` BLOB NOT NULL,
-	CONSTRAINT `invoice_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-	CONSTRAINT `invoice_FK_order` FOREIGN KEY (`orderID`) REFERENCES `Order` (`orderID`) ON DELETE RESTRICT ON UPDATE RESTRICT
+	CONSTRAINT `invoice_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE SET NULL,
+	CONSTRAINT `invoice_FK_order` FOREIGN KEY (`orderID`) REFERENCES `Order` (`orderID`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE `Receipt` (
 	`receiptID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	`accountID` INT NOT NULL,
+	`accountID` INT,
 	`orderID` INT NOT NULL,
 	`creationDate` DATETIME NOT NULL,
 	`data` BLOB NOT NULL,
-	CONSTRAINT `receipt_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-	CONSTRAINT `receipt_FK_order` FOREIGN KEY (`orderID`) REFERENCES `Order` (`orderID`) ON DELETE RESTRICT ON UPDATE RESTRICT
+	CONSTRAINT `receipt_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE SET NULL,
+	CONSTRAINT `receipt_FK_order` FOREIGN KEY (`orderID`) REFERENCES `Order` (`orderID`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE `Report` (
 	`reportID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	`creator` INT NOT NULL COMMENT 'AccountID',
+	`creator` INT COMMENT 'accountID',
 	`creationDate` DATETIME NOT NULL,
 	`data` BLOB NOT NULL,
-	CONSTRAINT `report_FK_account` FOREIGN KEY (`creator`) REFERENCES `Account` (`accountID`) ON DELETE RESTRICT ON UPDATE RESTRICT
+	CONSTRAINT `report_FK_account` FOREIGN KEY (`creator`) REFERENCES `Account` (`accountID`) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 # Weak entities
@@ -118,30 +120,31 @@ CREATE TABLE `Product-Tag` (
 	`productID` INT NOT NULL,
 	`tagID` INT NOT NULL,
 	PRIMARY KEY (`productID`, `tagID`),
-	CONSTRAINT `product-tag_FK_product` FOREIGN KEY (`productID`) REFERENCES `Product` (`productID`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-	CONSTRAINT `product-tag_FK_tag` FOREIGN KEY (`tagID`) REFERENCES `Tag` (`tagID`) ON DELETE RESTRICT ON UPDATE RESTRICT
+	CONSTRAINT `product-tag_FK_product` FOREIGN KEY (`productID`) REFERENCES `Product` (`productID`),
+	CONSTRAINT `product-tag_FK_tag` FOREIGN KEY (`tagID`) REFERENCES `Tag` (`tagID`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE `Product-Image` (
 	`productID` INT NOT NULL,
 	`imageID` INT NOT NULL,
 	PRIMARY KEY (`productID`, `imageID`),
-	CONSTRAINT `product-image_FK_product` FOREIGN KEY (`productID`) REFERENCES `Product` (`productID`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-	CONSTRAINT `product-image_FK_image` FOREIGN KEY (`imageID`) REFERENCES `Image` (`imageID`) ON DELETE RESTRICT ON UPDATE RESTRICT
+	CONSTRAINT `product-image_FK_product` FOREIGN KEY (`productID`) REFERENCES `Product` (`productID`),
+	CONSTRAINT `product-image_FK_image` FOREIGN KEY (`imageID`) REFERENCES `Image` (`imageID`)
 ) ENGINE=InnoDB;
 
+# A trolley entry will be automatically deleted when an associated account is deleted.
 CREATE TABLE `Trolley` (
 	`accountID` INT NOT NULL,
 	`lineItemID` INT NOT NULL,
 	PRIMARY KEY (`accountID`, `lineItemID`),
-	CONSTRAINT `trolley_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-	CONSTRAINT `trolley_FK_lineItem` FOREIGN KEY (`lineItemID`) REFERENCES `LineItem` (`lineItemID`) ON DELETE RESTRICT ON UPDATE RESTRICT
+	CONSTRAINT `trolley_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE CASCADE,
+	CONSTRAINT `trolley_FK_lineItem` FOREIGN KEY (`lineItemID`) REFERENCES `LineItem` (`lineItemID`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE `OrderItem` (
 	`orderID` INT NOT NULL,
 	`lineItemID` INT NOT NULL,
 	PRIMARY KEY (`orderID`, `lineItemID`),
-	CONSTRAINT `order-item_FK_account` FOREIGN KEY (`orderID`) REFERENCES `Order` (`orderID`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-	CONSTRAINT `order-item_FK_lineItem` FOREIGN KEY (`lineItemID`) REFERENCES `LineItem` (`lineItemID`) ON DELETE RESTRICT ON UPDATE RESTRICT
+	CONSTRAINT `order-item_FK_account` FOREIGN KEY (`orderID`) REFERENCES `Order` (`orderID`),
+	CONSTRAINT `order-item_FK_lineItem` FOREIGN KEY (`lineItemID`) REFERENCES `LineItem` (`lineItemID`)
 ) ENGINE=InnoDB;
