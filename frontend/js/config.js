@@ -84,11 +84,26 @@ async function fetchAndDisplayTokenDetails() {
         const tokenInfo = response.data;
         const userSpecificData = tokenInfo.data;
 
-        document.getElementById('tokenExpiresAt').textContent = tokenInfo.expires_at || '-';
-        document.getElementById('tokenAccountId').textContent = userSpecificData.account_ID || '-';
+        const date = new Date(tokenInfo.expires_at);
+
+        const options = {
+        weekday: "long",   // e.g. Tuesday
+        year: "numeric",
+        month: "long",     // e.g. June
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true
+        };
+
+        const formattedExpiresAt = date.toLocaleString(undefined, options) || null;
+
+        document.getElementById('tokenExpiresAt').textContent = formattedExpiresAt || '-';
+        document.getElementById('tokenAccountId').textContent = userSpecificData.accountID || '-';
         document.getElementById('tokenEmail').textContent = userSpecificData.email || '-';
-        document.getElementById('tokenRoleId').textContent = userSpecificData.role_ID !== undefined ? userSpecificData.role_ID : '-';
-        document.getElementById('tokenStatusId').textContent = userSpecificData.status_ID !== undefined ? userSpecificData.status_ID : '-';
+        document.getElementById('tokenRoleId').textContent = capitalize(userSpecificData.role) || '-';
+        document.getElementById('tokenStatusId').textContent = capitalize(userSpecificData.status) || '-';
         
         updateRawTokenValue();
         document.getElementById('currentToken').style.display = 'block';
@@ -96,8 +111,8 @@ async function fetchAndDisplayTokenDetails() {
         startTokenCountdown(tokenInfo.time_remaining_seconds);
     } else {
         let errorMessage = 'Failed to fetch token details.';
-        if (response.data && response.data.detail) errorMessage = response.data.detail;
-        else if (response.data && response.data.error) errorMessage = response.data.error;
+        if (response.data && response.data.Detail) errorMessage = response.data.Detail;
+        else if (response.data && response.data.Error) errorMessage = response.data.Error;
         else if (response.status) errorMessage += ` (Status: ${response.status})`;
         
         console.error("Error fetching token details:", response);

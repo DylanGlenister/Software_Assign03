@@ -18,9 +18,9 @@
         <div class="endpoint-body">
             <div class="fake-data-section">
                 <h4>Sample Data</h4>
-                <button id="fillLoginCustomerBtn" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">Customer</button>
-                <button id="fillLoginAdminBtn" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">Admin</button>
-                <button id="fillLoginEmployeeBtn" class="btn btn-secondary btn-sm" style="margin-bottom: 5px;">Employee</button>
+                <button id="fillCreateCustomerBtn" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">Customer</button>
+                <button id="fillCreateAdminBtn" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">Admin</button>
+                <button id="fillCreateEmployeeBtn" class="btn btn-secondary btn-sm" style="margin-bottom: 5px;">Employee</button>
             </div>
             
             <form id="createAccountForm">
@@ -30,10 +30,10 @@
                 </div>
                 <div class="form-group">
                     <label for="createAccountPassword">Password (min 8 characters)</label>
-                    <input type="password" id="createAccountPassword" class="form-control" minlength="8" required>
+                    <input type="text" id="createAccountPassword" class="form-control" minlength="8" required>
                 </div>
                 <div class="form-group">
-                    <label for="createAccountRole">Role ID</label>
+                    <label for="createAccountRole">Role</label>
                     <select id="createAccountRole" class="form-control" required>
                         <option value="">Select role</option>
                     </select>
@@ -41,8 +41,11 @@
                 <button type="submit" class="btn btn-primary">Create Account</button>
             </form>
             <div id="createAccountResponse" class="response-container" style="display: none;">
-                <h4>Response:</h4>
-                <div class="response-content"></div>
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
             </div>
         </div>
     </div>
@@ -61,10 +64,10 @@
         <div class="endpoint-body">
             <form id="changeOthersPasswordForm">
                 <div class="form-group">
-                    <label for="targetAccountId">Account ID</label>
-                    <select id="targetAccountId" class="form-control" required>
+                    <label for="changePasswordAccountId">Account ID</label>
+                    <select id="changePasswordAccountId" class="form-control" required>
                         <option value="">Select account</option>
-                </select>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="othersNewPassword">New Password (min 8 characters)</label>
@@ -73,8 +76,11 @@
                 <button type="submit" class="btn btn-primary">Change Password</button>
             </form>
             <div id="changeOthersPasswordResponse" class="response-container" style="display: none;">
-                <h4>Response:</h4>
-                <div class="response-content"></div>
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
             </div>
         </div>
     </div>
@@ -100,8 +106,11 @@
                 <button type="submit" class="btn btn-primary">Deactivate Account</button>
             </form>
             <div id="deactivateAccountResponse" class="response-container" style="display: none;">
-                <h4>Response:</h4>
-                <div class="response-content"></div>
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
             </div>
         </div>
     </div>
@@ -127,8 +136,52 @@
                 <button type="submit" class="btn btn-primary">Delete Account</button>
             </form>
             <div id="deleteAccountResponse" class="response-container" style="display: none;">
-                <h4>Response:</h4>
-                <div class="response-content"></div>
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Accounts -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-delete">DELETE</span>
+            <span>/admin/deleteAccounts</span>
+            <p class="endpoint-description">
+                <strong>MUST BE LOGGED IN AS ADMIN TO USE</strong><br>
+                Allows admins to delete accounts using filters. <br>
+                Atleast one must be set.
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <form id="deleteFilteredAccountsForm">
+                <div class="form-group">
+                    <label for="deleteFilteredAccountsRole">Role (optional)</label>
+                    <select id="deleteFilteredAccountsRole" class="form-control">
+                        <option value="">Select role</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="deleteFilteredAccountsStatus">Status (optional)</label>
+                    <select id="deleteFilteredAccountsStatus" class="form-control">
+                        <option value="">Select status</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="deleteFilteredAccountsDaysOld">Days Old (optional)</label>
+                    <input type="number" id="deleteFilteredAccountsDaysOld" class="form-control">
+                </div>
+                <button type="submit" class="btn btn-primary">Delete Account</button>
+            </form>
+            <div id="deleteFilteredAccountsResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
             </div>
         </div>
     </div>
@@ -146,8 +199,15 @@
         <div class="endpoint-body">
             <button id="getAllAccountsBtn" class="btn btn-primary">Get All Accounts</button>
             <div id="getAllAccountsResponse" class="response-container" style="display: none;">
-                <h4>Response:</h4>
-                <div class="response-content"></div>
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Table</strong></summary>
+                    <div class="table-container"></div><br>
+                </details>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
             </div>
         </div>
     </div>

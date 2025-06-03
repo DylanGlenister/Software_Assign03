@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from enum import Enum
 
 class Settings(BaseSettings):
     api_path: str

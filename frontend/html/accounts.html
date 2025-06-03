@@ -19,7 +19,8 @@
                 <h4>Fill Sample Login Data:</h4>
                 <button id="fillLoginCustomerBtn" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">Customer</button>
                 <button id="fillLoginAdminBtn" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">Admin</button>
-                <button id="fillLoginEmployeeBtn" class="btn btn-secondary btn-sm" style="margin-bottom: 5px;">Employee</button>
+                <button id="fillLoginEmployeeBtn" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">Employee</button>
+                <button id="fillLoginOwnerBtn" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">Owner</button>
             </div>
             
             <form id="loginForm">
@@ -34,8 +35,11 @@
                 <button type="submit" class="btn btn-primary">Login</button>
             </form>
             <div id="loginResponse" class="response-container" style="display: none;">
-                <h4>Response:</h4>
-                <div class="response-content"></div>
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
             </div>
         </div>
     </div>
@@ -53,6 +57,14 @@
         <div class="endpoint-body">
             <form id="updateAccountForm">
                 <div class="form-group">
+                    <label for="updateFirstName">First Name (optional)</label>
+                    <input type="text" id="updateFirstName" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="updateLastName">Last Name (optional)</label>
+                    <input type="text" id="updateLastName" class="form-control">
+                </div>
+                <div class="form-group">
                     <label for="updateEmail">New Email (optional)</label>
                     <input type="email" id="updateEmail" class="form-control">
                 </div>
@@ -65,8 +77,11 @@
                 <button type="submit" class="btn btn-primary">Update Account</button>
             </form>
             <div id="updateAccountResponse" class="response-container" style="display: none;">
-                <h4>Response:</h4>
-                <div class="response-content"></div>
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
             </div>
         </div>
     </div>
@@ -79,19 +94,23 @@
             <p class="endpoint-description">
                 <strong>MUST BE LOGGED IN TO USE</strong><br>
                 Used to allow users to change their password.
+                The password field would be set as a html password type to hide the characters inputed but for demo purposes just a text field.
             </p>
         </div>
         <div class="endpoint-body">
             <form id="changePasswordForm">
                 <div class="form-group">
                     <label for="newPassword">New Password (min 8 characters)</label>
-                    <input type="password" id="newPassword" class="form-control" minlength="8" required>
+                    <input type="text" id="newPassword" class="form-control" minlength="8" required>
                 </div>
                 <button type="submit" class="btn btn-primary">Change Password</button>
             </form>
             <div id="changePasswordResponse" class="response-container" style="display: none;">
-                <h4>Response:</h4>
-                <div class="response-content"></div>
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
             </div>
         </div>
     </div>

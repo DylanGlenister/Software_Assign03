@@ -1,17 +1,20 @@
 from typing import Optional, Type
 from pydantic import EmailStr, ValidationError
 from bcrypt import checkpw, gensalt, hashpw
+import re
 
-from ..core.database import Database
+from ..core.database import Database, Role, Status
 
 class Account:
-	def __init__(self, account_ID, email, password, creation_date, role_ID, status_ID):
-		self.account_ID = account_ID
+	def __init__(self, accountID, email, password, firstname, lastname, creationDate, role: Role, status: Status):
+		self.accountID = accountID
 		self.email = email
 		self.password = password
-		self.creation_date = creation_date
-		self.role_ID = role_ID
-		self.status_ID = status_ID
+		self.firstname = firstname
+		self.lastname = lastname
+		self.creationDate = creationDate
+		self.role: Role = role
+		self.status: Status = status
 
 	@classmethod
 	def _hash_password(cls, password: str) -> str:
@@ -22,26 +25,66 @@ class Account:
 	@classmethod
 	def login(cls: Type["Account"], db: Database, email: EmailStr, password: str) -> Optional["Account"]:
 		"""Attempt to find an account with matching email and password."""
-		row: tuple = db.get_account(_email=email)
-		if not row:
+		account: dict = db.get_account(_email=email)
+		if not account:
 			print("No account found with that email.")
 			return None
 
-		account_ID, db_email, db_password, creation_date, role_ID, status_ID = row
-
-		if checkpw(password.encode('utf-8'), db_password.encode('utf-8')):
-			return cls(account_ID, db_email, db_password, creation_date, role_ID, status_ID)
+		if checkpw(password.encode('utf-8'), account['password'].encode('utf-8')):
+			return cls(
+				accountID=account['accountID'],
+				email=account['email'],
+				password=account['password'],
+				firstname=account['firstname'],
+				lastname=account['lastname'],
+				creationDate=account['creationDate'],
+				role=account['role'],
+				status=account['status']
+        	)
 		else:
-			print(password)
-			print("Password incorrect.")
+			print(f"Password '${password}' is incorrect.")
 			return None
+	
+	@classmethod
+	def verify_password(cls, password):
+		errors = []
 
-	def verify_perms(self, db: Database, required_roles: list[int]) -> bool:
-		role: dict = db.get_role(self.role_ID)
-		return role.roleID in required_roles
+		if len(password) < 8:
+			errors.append("Password must be at least 8 characters long.")
+
+		if not any(char.isupper() for char in password):
+			errors.append("Password must contain at least one uppercase letter.")
+
+		if not any(char.islower() for char in password):
+			errors.append("Password must contain at least one lowercase letter.")
+
+		if not any(char.isdigit() for char in password):
+			errors.append("Password must contain at least one digit.")
+
+		if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+			errors.append("Password must contain at least one special character.")
+
+		return errors
+
+	def verify_perms(self, required_roles: list[Role], inverse: bool = False) -> bool:
+		"""
+		Check if the user's role matches the required roles.
+
+		- Returns True if the user's role is Role.OWNER (superuser override).
+		- If inverse=True: returns True if user's role is NOT in required_roles.
+		- If inverse=False: returns True if user's role IS in required_roles.
+		"""
+		user: Role = Role(self.role)
+		if user == Role.OWNER:
+			return not inverse
+
+		if inverse:
+			return user not in required_roles
+
+		return user in required_roles
 
 	def update_info(self, db: Database, **fields) -> bool:
-		valid_fields: dict = {"email", "status_ID"}
+		valid_fields: dict = {"email", "status", "firstname", "lastname"}
 
 		filtered_fields: dict = {}
 		for key, value in fields.items():
@@ -55,21 +98,18 @@ class Account:
 				filtered_fields["email"] = str(filtered_fields["email"].strip().lower())
 			except ValidationError:
 				return {"error": "Invalid email format."}
-
-		if "status_ID" in filtered_fields and not db.status_exists(filtered_fields["status_ID"]):
-			return {"error": "Invalid status ID."}
+		
+		if "status" in filtered_fields:
+			try:
+				filtered_fields["status"] = Role(filtered_fields["status"])
+			except ValidationError:
+				raise ValidationError(["Status does not exist"])
 
 
 		if not filtered_fields:
 			return {"error": "No valid fields to update."}
-
-		translation_map = {
-			"status_ID": "statusID",
-			"email": "email",
-		}
-
-		filtered_fields_db = {translation_map[k]: v for k, v in filtered_fields.items()}
-		success: bool = db.update_account(self.account_ID, **filtered_fields_db)
+		
+		success: bool = db.update_account(self.accountID, **filtered_fields)
 
 		if success:
 			for key, value in filtered_fields.items():
@@ -77,14 +117,19 @@ class Account:
 		return {"success": success}
 
 	def change_password(self, db: Database, new_password: str) -> bool:
-		if len(new_password) < 8:
-			return {"error": "Password must be at least 8 characters long."}
+		errors = self.verify_password(new_password)
+		if errors:
+			raise ValueError("\n".join(errors))
 
-		if not any(char.isupper() for char in new_password):
-			return {"error": "Password must contain at least one uppercase letter."}
+		try:
+			hashed: str = self._hash_password(new_password)
+			success: bool = db.update_account(self.accountID, password=hashed)
 
-		hashed: str = self._hash_password(new_password)
-		success: bool = db.update_account(self.account_ID, password=hashed)
-		if success:
+			if not success:
+				raise RuntimeError("Failed to update password in database")
+
 			self.password = hashed
-		return success
+			return True
+
+		except Exception as e:
+			raise RuntimeError(f"An unknown error occurred: {str(e)}")

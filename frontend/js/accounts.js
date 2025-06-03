@@ -1,7 +1,8 @@
 const SAMPLE_CREDENTIALS = {
-    customer: { email: 'customer@example.com', password: 'password' },
-    admin: { email: 'admin@example.com', password: 'password' },
-    employee: { email: 'employee@example.com', password: 'password' }
+    customer: { email: 'customer@example.com', password: 'CustomerPassword101112%' },
+    admin: { email: 'admin@example.com', password: 'AdminPassword789%' },
+    employee: { email: 'employee@example.com', password: 'EmployeePassword456%' },
+    owner: {email: 'owner@example.com', password: 'OwnerPassword123%'}
 };
 
 async function initAccounts() {
@@ -12,6 +13,7 @@ async function initAccounts() {
     document.getElementById('fillLoginCustomerBtn')?.addEventListener('click', () => fillLoginData('customer'));
     document.getElementById('fillLoginAdminBtn')?.addEventListener('click', () => fillLoginData('admin'));
     document.getElementById('fillLoginEmployeeBtn')?.addEventListener('click', () => fillLoginData('employee'));
+    document.getElementById('fillLoginOwnerBtn')?.addEventListener('click', () => fillLoginData('owner'));
 
     setSelectOptions({
         endpoint: '/utility/getStatuses',
@@ -47,9 +49,13 @@ async function handleUpdateAccount(e) {
     setFormLoading('updateAccountForm', true);
     const email = document.getElementById('updateEmail').value;
     const status = document.getElementById('updateStatus').value;
+    const firstName = document.getElementById('updateFirstName').value;
+    const lastName = document.getElementById('updateLastName').value;
     const payload = {};
     if (email) payload.email = email;
-    if (status !== "") payload.status_ID = parseInt(status);
+    if (status !== "") payload.status = status;
+    if (firstName !== "") payload.firstname = firstName
+    if (lastName !== "") payload.lastname = lastName
     
     if (Object.keys(payload).length === 0) {
         showNotification('No data provided for update.', 'info');

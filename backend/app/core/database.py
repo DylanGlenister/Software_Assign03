@@ -4,7 +4,6 @@ from typing import Any, Generator
 
 import mariadb
 from fastapi import HTTPException, status
-
 from ..utils.settings import SETTINGS
 
 # TODO Currently _execute can return 3 types, dependent on parameters. This fuckery trickles to all code that uses this function.
@@ -256,39 +255,48 @@ class Database:
 
 		return self._fetch_one(query, params)
 
-	def get_accounts_by_role(self, _role: Role, /) -> list[dict[str, Any]] | None:
+	def get_accounts(
+		self,
+		*,
+		role: Role | None = None,
+		status: Status | None = None,
+		olderThan: int | None = None
+	) -> list[dict[str, Any]] | None:
 		"""
-		Retrieve all accounts with a specific role.
+		Retrieve accounts with optional filtering by role and/or status.
+		If no filters are provided, returns all accounts.
 
 		Args:
-			_role: Role to filter by
+			role: Optional role to filter by
+			status: Optional status to filter by
+			olderThan: Optional int which signifies days, and can get accounts older than x days
 
 		Returns:
-			list of account dictionaries or None
+			list of account dictionaries or None if no results/error
 		"""
 		query = '''
 			SELECT accountID, email, firstname, lastname, creationDate, role, status
 			FROM Account
-			WHERE role = %s
 		'''
-		return self._fetch_all(query, (_role.value,))
-
-	def get_accounts_by_status(self, _status: Status, /) -> list[dict[str, Any]] | None:
-		"""
-		Retrieve all accounts with a specific status.
-
-		Args:
-			_status: Status to filter by
-
-		Returns:
-			list of account dictionaries or None
-		"""
-		query = '''
-			SELECT accountID, email, firstname, lastname, creationDate, role, status
-			FROM Account
-			WHERE status = %s
-		'''
-		return self._fetch_all(query, (_status.value,))
+		conditions = []
+		params = []
+		
+		if role is not None:
+			conditions.append("role = %s")
+			params.append(role.value)
+		
+		if status is not None:
+			conditions.append("status = %s")
+			params.append(status.value)
+		
+		if olderThan is not None:
+			conditions.append("creationDate < DATE_SUB(CURDATE(), INTERVAL %s DAY)")
+			params.append(olderThan)
+		
+		if conditions:
+			query += " WHERE " + " AND ".join(conditions)
+		
+		return self._fetch_all(query, tuple(params) if params else ())
 
 	def create_account(
 		self,
@@ -298,7 +306,7 @@ class Database:
 		*,
 		_firstName: str | None = None,
 		_lastName: str | None = None,
-		_creationDate: datetime = datetime.now()
+		_creationDate: datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 	) -> int | None:
 		"""
 		Create a new account in the database.
@@ -354,18 +362,22 @@ class Database:
 		return self._execute(query, params)
 
 	# NOTE This currently does not work as the database constraints prevent it
-	def delete_account(self, _accountId: int, /) -> bool | int | None:
+	def delete_accounts(self, _accountIds: list[int], /) -> bool | int | None:
 		"""
-		Delete an account from the database.
+		Delete accounts from the database.
 
 		Args:
-			_accountId: Account ID to delete
+			_accountIds: List of account IDs to delete
 
 		Returns:
 			True on success, False on error
 		"""
-		query = 'DELETE FROM Account WHERE accountID = %s'
-		return self._execute(query, (_accountId,))
+		if not _accountIds:
+			return False  # Nothing to delete
+
+		placeholders = ', '.join(['%s'] * len(_accountIds))
+		query = f'DELETE FROM Account WHERE accountID IN ({placeholders})'
+		return self._execute(query, tuple(_accountIds))
 
 	# --- Address Management ---
 
@@ -716,6 +728,41 @@ class Database:
 			WHERE reportID = %s
 		'''
 		return self._fetch_one(query, (_reportId,))
+	
+	# --- Utilities ---
+	def get_enum_values(self, tableName: str, columnName: str) -> list[str]:
+		"""
+		Retrieve the enum values for a specific column in a MariaDB table.
+
+		Args:
+			conn: Active mariadb connection.
+			tableName: Name of the table.
+			columnName: Name of the enum column.
+
+		Returns:
+			List of enum values as strings.
+
+		Raises:
+			ValueError if the column is not an ENUM type.
+		"""
+		query = """
+			SELECT COLUMN_TYPE
+			FROM INFORMATION_SCHEMA.COLUMNS
+			WHERE TABLE_SCHEMA = DATABASE()
+			AND TABLE_NAME = %s
+			AND COLUMN_NAME = %s
+		"""
+		result = self._fetch_one(query, (tableName, columnName))
+		if not result:
+			raise ValueError(f"Column `{tableName}` in table `{columnName}` not found.")
+		column_type = result["COLUMN_TYPE"]
+		if not column_type.startswith("enum("):
+			raise ValueError(f"Column `{columnName}` is not an ENUM type.")
+
+		enum_str = column_type[5:-1]
+
+		enum_values = [v.strip("'") for v in enum_str.split(",")]
+		return enum_values
 
 
 def get_db() -> Generator[Database, None, None]:

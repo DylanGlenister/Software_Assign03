@@ -57,15 +57,54 @@ function displayResponse(elementId, response) {
         console.warn(`Response container with ID '${elementId}' not found.`);
         return;
     }
+
     const content = container.querySelector('.response-content');
     if (!content) {
         console.warn(`Response content area not found in container '${elementId}'.`);
         return;
     }
+
     container.style.display = 'block';
-    content.textContent = JSON.stringify(response, null, 2);
+
+    content.innerHTML = JSON.stringify(response, null, 2);
     container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+
+function createTable(elementId, items) {
+    const container = document.getElementById(elementId);
+    if (!container) {
+        console.warn(`Response container with ID '${elementId}' not found.`);
+        return;
+    }
+
+    const tableContainer = container.querySelector('.table-container');
+    if (!tableContainer) {
+        console.warn(`Table content area not found in container '${elementId}'.`);
+        return;
+    }
+    if (!items.length) {
+        tableContainer.innerHTML = '<p>No data available.</p>';
+        return;
+    }
+
+    const headers = Object.keys(items[0]);
+
+    let table = `<table class="table table-striped">
+        <thead>
+            <tr>${headers.map(key => `<th>${formatHeader(key)}</th>`).join('')}</tr>
+        </thead>
+        <tbody>`;
+
+    for (const item of items) {
+        table += `<tr>${headers.map(key => `<td>${formatValue(item[key])}</td>`).join('')}</tr>`;
+    }
+
+    table += '</tbody></table>';
+
+    tableContainer.innerHTML = table
+}
+
+
 
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
@@ -103,16 +142,49 @@ function updateTokenDisplay() {
     }
 }
 
-function setOptions(data, element) {
+function setOptions(data, element, idKey, nameKey) {
     data.forEach(entry => {
         const option = document.createElement('option');
-        option.value = entry.id;
-        option.textContent = `${entry.id} (${entry.name})`;
+        option.value = entry[idKey];
+        option.textContent = `${entry[idKey]} (${entry[nameKey]})`;
         element.appendChild(option);
     });
 }
 
-async function setSelectOptions({ endpoint, elements, label = 'Select an option', key, errorMessage, requireAuth = false}) {
+function capitalize(text) {
+    return text
+        .split(' ')
+        .map(word =>
+            word.length > 1 ? word[0].toUpperCase() + word.slice(1) : word.toUpperCase()
+        )
+        .join(' ');
+}
+
+function formatHeader(header) {
+    header = header.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+    return capitalize(header);
+}
+
+function formatValue(value) {
+    if (value === null || value === undefined || value === '') return '-';
+    if (typeof value === 'number' && Number.isInteger(value)) return value
+
+    const date = new Date(value);
+    if (!isNaN(date)) {
+        return date.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+        });
+    }
+
+    return capitalize(String(value))
+}
+
+async function setSelectOptions({ endpoint, elements, label = 'Select an option', key, errorMessage, requireAuth = false, idKey = "id", nameKey = "name"}) {
     const response = await makeRequest(endpoint, 'GET', {}, requireAuth);
 
     if (!response.ok || !response.data || !response.data[key]) {
@@ -125,7 +197,7 @@ async function setSelectOptions({ endpoint, elements, label = 'Select an option'
         const selectElement = document.getElementById(elementId);
         selectElement.innerHTML = `<option value="">${label}</option>`;
         
-        setOptions(response.data[key], selectElement);
+        setOptions(response.data[key], selectElement, idKey, nameKey);
     })
 }
 

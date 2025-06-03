@@ -1,65 +1,74 @@
 from pydantic import EmailStr
 from datetime import datetime
 from uuid import uuid4
+from fastapi import HTTPException, status as httpStatus
 
 from .account import Account
-from ..core.database import Database
+from ..core.database import Database, Role, Status
 
 class CustomerAccount(Account):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    @classmethod
-    def register(cls, db: Database, email: EmailStr, password: str, role_ID: int = 1, status_ID: int = 1) -> dict:
+    def register(cls, db: Database, email: EmailStr, password: str, role: Role, status: Status) -> dict:
         """Create a new account with hashed password."""
-        existing: tuple = db.get_account(_email=email)
+        existing: dict = db.get_account(email=email)
         if existing:
-            return {"error": "An account with that email already exists"}
+            raise HTTPException(
+                status_code=httpStatus.HTTP_409_CONFLICT,
+                detail="An account with that email already exists."
+            )
 
         if len(password) < 8:
-            return {"error": "Password must be at least 8 characters long."}
+            raise HTTPException(
+                status_code=httpStatus.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Password must be at least 8 characters long."
+            )
 
         if not any(char.isupper() for char in password):
-            return {"error": "Password must contain at least one uppercase letter."}
-
-        if not db.role_exists(role_ID):
-            return {"error": "Invalid role ID."}
-
-        if not db.status_exists(status_ID):
-            return {"error": "Invalid status ID."}
+            raise HTTPException(
+                status_code=httpStatus.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Password must contain at least one uppercase letter."
+            )
 
         hashed_password: str = cls._hash_password(password)
         email = email.strip().lower()
-        creation_date: datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        creation_date: str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        account_ID: int = db.create_account(email, hashed_password, creation_date, role_ID, status_ID)
-        if account_ID is None:
-            return {"error": "An unknown issue caused account creation to fail"}
+        accountID: int = db.create_account(email, hashed_password, creation_date, role, status)
+        if accountID is None:
+            raise HTTPException(
+                status_code=httpStatus.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unknown issue caused account creation to fail."
+            )
 
-        return {"account": cls(account_ID, email, hashed_password, creation_date, role_ID = role_ID, status_ID = status_ID)}
-
+        return {"account": cls(accountID, email, hashed_password, creation_date, role=role, status=status)}
+    
     @classmethod
     def create_guest(cls, db: Database) -> dict:
         guest_email = f"guest_{uuid4().hex[:8]}@temp.domain"
         creation_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        account_ID: int = db.create_account(guest_email, "", creation_date, _role = 4, status_ID = 3) #Role guest, status Temp
-        if account_ID is None:
-            return {"error": "An unknown issue caused account creation to fail"}
+        accountID: int = db.create_account(guest_email, "", creation_date, role=Role.GUEST, status=Status.ACTIVE)
+        if accountID is None:
+            raise HTTPException(
+                status_code=httpStatus.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unknown issue caused guest account creation to fail."
+            )
 
-        return {"account": cls(account_ID, guest_email, "", creation_date, role_ID = 4, status_ID = 3)}
+        return {"account": cls(accountID, guest_email, "", creation_date, role=Role.GUEST, status=Status.ACTIVE)}
 
     def get_trolly(self, db: Database):
-        return db.get_trolley(self.account_ID)
+        return db.get_trolley(self.accountID)
 
     def add_to_trolly(self, db: Database, product_id: int, amount: int):
-        return db.add_to_trolley(self.account_ID, product_id, amount)
+        return db.add_to_trolley(self.accountID, product_id, amount)
 
     def remove_from_trolly(self, db: Database, product_id: int, amount: int):
-        return db.remove_from_trolley(self.account_ID, product_id, amount)
+        return db.remove_from_trolley(self.accountID, product_id, amount)
 
     def clear_trolly(self, db: Database):
-        return db.clear_trolley(self.account_ID)
+        return db.clear_trolley(self.accountID)
 
     def create_order(self, db: Database, order_manager):
         trolly: list[tuple] = self.get_trolly(db)

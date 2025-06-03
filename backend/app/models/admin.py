@@ -1,75 +1,111 @@
 from typing import Tuple
 from pydantic import EmailStr
 from datetime import datetime, timedelta
+from fastapi import HTTPException, status
 
 from .account import Account
-from ..core.database import Database
+from ..core.database import Database, Role, Status
 
 class AdminAccount(Account):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def change_others_password(self, db: Database, new_password: str, account_ID: int):
+    def change_others_password(self, db: Database, new_password: str, accountID: int) -> None:
+        errors = self.verify_password(new_password)
+        if errors:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=errors
+            )
+
         hashed: str = self._hash_password(new_password)
-        success: bool = db.update_account(account_ID, password=hashed)
-        if success:
-            self.password = hashed
-        return success
+        success: bool = db.update_account(accountID, password=hashed)
+        
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to update password for account ID {accountID}"
+            )
 
-    def create_account(self, db: Database, role_ID: int, email: EmailStr, password: str):
-        existing: Tuple = db.get_account(_email=email)
+        self.password = hashed
+
+    def create_account(self, db: Database, role: Role, email: EmailStr, password: str) -> None:
+        existing: dict = db.get_account(_email=email)
         if existing:
-            return {"error": "An account with that email already exists"}
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with that email already exists."
+            )
 
-        if len(password) < 8:
-            return {"error": "Password must be at least 8 characters long."}
-
-        if not any(char.isupper() for char in password):
-            return {"error": "Password must contain at least one uppercase letter."}
-
-        if not db.role_exists(role_ID):
-            return {"error": "Invalid role ID."}
+        errors = self.verify_password(password)
+        if errors:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=errors
+            )
 
         hashed_password: str = self._hash_password(password)
         email = email.strip().lower()
-        creation_date: datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        account_ID: int = db.create_account(email, hashed_password, creation_date, role_ID, 1)
-        if account_ID is None:
-            return {"error": "An unknown issue caused account creation to fail"}
+        accountID: int = db.create_account(email, hashed_password, role)
+        if accountID is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unknown error occurred while creating the account."
+            )
+    
+    def get_account(self, db: Database, accountID: int) -> dict:
+        account: dict = db.get_account(_accountId=accountID)
+        
+        if not account:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Account not found."
+            )
+        
+        return account
+    
+    def deactivate_account(self, db: Database, accountID: int) -> None:
+        self.get_account(db, accountID)
 
-        return {"success": "Account created successfully"}
-
-    def deactivate_account(self, db: Database, account_ID: int):
-        if not db.get_account(_accountID=account_ID):
-            return {"error": "Account not found."}
-
-        success: bool = db.update_account(account_ID, statusID=2)
+        success: bool = db.update_account(accountID, status=Status.INACTIVE.value)
         if not success:
-            return {"error": f"An unknown error has caused the deactivating of account {account_ID} to fail."}
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to deactivate account ID {accountID}."
+            )
 
-        return {"success": success}
-
-    def delete_account(self, db: Database, account_ID: int):
-        if not db.get_account(_accountID=account_ID):
-            return {"error": "Account not found."}
-
-        success: bool = db.delete_account(account_ID)
+    def delete_accounts(self, db: Database, accountIDs: list[int]) -> None:
+        success: bool = db.delete_accounts(accountIDs)
         if not success:
-            return {"error": f"An unknown error has caused the deleting of account {account_ID} to fail."}
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete account ID {accountIDs}."
+            )
 
-        return {"success": success}
+    def get_all_accounts(self, db: Database, filters: dict = None) -> list[dict]:
+        try:
+            return db.get_accounts(**(filters or {}))
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to retrieve accounts: {str(e)}"
+            )
 
-    def get_all_accounts(self, db: Database, filters: dict = None) -> list[Tuple]:
-        return db.get_all_accounts()
-
-    def delete_old_accounts_by_role(self, db: Database, days: int, role_ID: int):
-        older_than: timedelta = timedelta(days=days)
-
-        cutoff_date: datetime = (datetime.now() - older_than).strftime("%Y-%m-%d %H:%M:%S")
-        success: bool = db.delete_old_accounts_by_role(role_ID=role_ID, before_date=cutoff_date)
+    def delete_old_accounts_by_role(self, db: Database, days: int, role: Role) -> str:
+        try:
+            cutoff_date: str = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+            success: bool = db.delete_old_accounts_by_role(role=role, before_date=cutoff_date)
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error deleting old accounts: {str(e)}"
+            )
 
         if not success:
-            return {"error": "An unknown error has caused removing old accounts to fail."}
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unknown error occurred while deleting old accounts."
+            )
 
-        return {"success": f"Removed accounts that were older than {days} days"}
+        return f"Removed accounts older than {days} days"

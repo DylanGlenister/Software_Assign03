@@ -17,10 +17,10 @@ def get_customer_account(token: Optional[str] = Depends(get_token), db: Database
     #Create guest account
     guest_account: CustomerAccount = CustomerAccount.create_guest(db).get("account")
     token_data: dict = {
-        "account_ID": guest_account.account_ID,
+        "accountID": guest_account.accountID,
         "email": guest_account.email,
-        "role_ID": guest_account.role_ID,
-        "status_ID": guest_account.status_ID
+        "role": guest_account.role,
+        "status": guest_account.status
     }
     token = create_token(token_data, 60)
     return {"account": guest_account, "token": token}  
@@ -28,6 +28,10 @@ def get_customer_account(token: Optional[str] = Depends(get_token), db: Database
 class RegisterPayload(BaseModel):
 	email: EmailStr = "customer@example.com"
 	password: str = "password"
+
+class TrollyItem(BaseModel):
+    product_id: int
+    amount: int = 1
 
 @customer_route.post("/register")
 def register_route(payload: RegisterPayload, db: Database = Depends(get_db)):
@@ -45,10 +49,6 @@ def register_route(payload: RegisterPayload, db: Database = Depends(get_db)):
 		"message": "Registration successful",
 		"email": account.email
 	}
-
-class TrollyItem(BaseModel):
-    product_id: int
-    amount: int = 1
 
 @customer_route.get("/trolley")
 def get_trolly_route(db: Database = Depends(get_db), customer_data: dict = Depends(get_customer_account)):

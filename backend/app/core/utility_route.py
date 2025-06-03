@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer
 from datetime import datetime, timezone
+from pydantic import BaseModel
 import mariadb
 
 from ..models.account import Account
@@ -30,8 +31,8 @@ def database_health(db: Database = Depends(get_db)):
     Checks DB connection and simple SELECT query.
     """
     try:
-        result = db._fetch_one("SELECT 1 AS result")
-        if result is None or result[0] != 1:
+        result = db._fetch_one("SELECT 1 AS result").get("result")
+        if result is None or result != 1:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database query check failed: 'SELECT 1' did not return the expected value."
@@ -55,16 +56,15 @@ def database_health(db: Database = Depends(get_db)):
 
 @utility_route.get("/getRoles")
 def get_roles(db: Database = Depends(get_db)):
-    roles = db.get_roles()
-    formatted = [{"id": role_id, "name": name} for role_id, name in roles]
+    result = db.get_enum_values("Account", "role")
+    formatted = [{"id": entry, "name": entry.capitalize()} for entry in result]
     return {"roles": formatted}
 
 @utility_route.get("/getStatuses")
 def get_statuses(db: Database = Depends(get_db)):
-    statuses = db.get_statuses()
-    formatted = [{"id": status_id, "name": name} for status_id, name in statuses]
+    result = db.get_enum_values("Account", "status")
+    formatted = [{"id": entry, "name": entry.capitalize()} for entry in result]
     return {"statuses": formatted}
-
 
 # Warning: Below this message are routes that would not be implemented on the real site, but are instead used for testing and showing implementation
 
@@ -100,4 +100,15 @@ def get_products(db: Database = Depends(get_db)):
 @utility_route.get("/secureExample", dependencies=[Depends(bearer_scheme)], summary="Example secured route")
 def secure_example():
     return {"message": "You are authorized"}
+
+class PasswordRequest(BaseModel):
+    password: str
+
+@utility_route.post("/hashPassword", summary="Hash a password using the Account model")
+def hash_password(data: PasswordRequest):
+    if not data.password or len(data.password.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Password cannot be empty")
+
+    hashed = Account._hash_password(data.password)
+    return {"hashed_password": hashed}
     

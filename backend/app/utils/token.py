@@ -5,16 +5,16 @@ import jwt
 from typing import Optional
 from pydantic import BaseModel
 
-from ..core.database import get_db, Database
+from ..core.database import get_db, Database, Role, Status
 from .settings import SETTINGS
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
 class TokenData(BaseModel):
-    account_ID: int
+    accountID: int
     email: str
-    role_ID: int = 1
-    status_ID: int = 1
+    role: Role
+    status: Status
     exp: Optional[int] = None
 
 def create_token( data: dict, expires_in: int = SETTINGS.access_token_expire_minutes,
@@ -66,20 +66,11 @@ def get_account_data(token: str = Depends(get_secure_token), db: Database = Depe
             detail="Invalid or expired token"
         )
 
-    account_data: tuple = db.get_account(_accountID=token_data.account_ID)
+    account_data = db.get_account(_accountId=token_data.accountID)
     if not account_data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Account not found"
         )
 
-    account_dict: dict = {
-        "account_ID": account_data[0],
-        "email": account_data[1],
-        "password": account_data[2],
-        "creation_date": account_data[3],
-        "role_ID": account_data[4],
-        "status_ID": account_data[5]
-    }
-
-    return account_dict
+    return account_data
