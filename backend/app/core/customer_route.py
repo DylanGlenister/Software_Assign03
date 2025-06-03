@@ -55,8 +55,7 @@ def get_trolly_route(db: Database = Depends(get_db), customer_data: dict = Depen
     customer: CustomerAccount = customer_data.get("account")
     result: dict = {"token": customer_data.get("token")}
     
-    trolley_data = customer.get_trolly(db)
-    result["trolley"] = [{"product_ID": product, "ammount": ammount} for product, ammount in trolley_data]
+    result["trolley"] = customer.get_trolly(db)
     return result
 
 

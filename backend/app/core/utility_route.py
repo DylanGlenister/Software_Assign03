@@ -93,9 +93,8 @@ def token_info(token: str = Depends(get_token)):
 ### TEMP ROUTE UNTILL IMPEMENTED
 @utility_route.get("/getProducts")
 def get_products(db: Database = Depends(get_db)):
-    products = db._fetch_all("SELECT * FROM products")
-    formatted = [{"id": id, "name": name} for id, name in products]
-    return {"products": formatted}
+    products = db.get_products_with_tags()
+    return {"products": products}
 
 @utility_route.get("/secureExample", dependencies=[Depends(bearer_scheme)], summary="Example secured route")
 def secure_example():

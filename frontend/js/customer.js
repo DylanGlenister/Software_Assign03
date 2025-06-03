@@ -11,6 +11,7 @@ function initCustomer() {
         elements: ['addProductId'],
         label: 'Select product',
         key: 'products',
+        idKey: 'productID',
         errorMessage: 'Could not get products'
     })
 }
@@ -47,6 +48,7 @@ async function getTrolley() {
 
     
     displayResponse('getTrolleyResponse', response);
+    createTable('getTrolleyResponse', response.data.trolley);
 }
 
 async function handleAddToTrolley(e) {
@@ -87,5 +89,5 @@ async function clearTrolley() {
 function fillRegisterData() {
     const timestamp = Date.now();
     document.getElementById('registerEmail').value = `customer${timestamp}@example.com`;
-    document.getElementById('registerPassword').value = 'password123';
+    document.getElementById('registerPassword').value = SAMPLE_CREDENTIALS['customer']['password'];
 }

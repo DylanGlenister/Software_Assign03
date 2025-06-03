@@ -549,7 +549,7 @@ class Database:
 			JOIN LineItem li ON t.lineItemID = li.lineItemID
 			WHERE t.accountID = %s
 		'''
-		return self._fetch_all(query, (_accountId,))
+		return self._fetch_all(query, (_accountId,)) or []
 
 	def add_to_trolley(self, _accountId: int, _productId: int, _quantity: int = 1, /) -> bool | int | None:
 		"""
