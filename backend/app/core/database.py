@@ -280,22 +280,22 @@ class Database:
 		'''
 		conditions = []
 		params = []
-		
+
 		if role is not None:
 			conditions.append("role = %s")
 			params.append(role.value)
-		
+
 		if status is not None:
 			conditions.append("status = %s")
 			params.append(status.value)
-		
+
 		if olderThan is not None:
 			conditions.append("creationDate < DATE_SUB(CURDATE(), INTERVAL %s DAY)")
 			params.append(olderThan)
-		
+
 		if conditions:
 			query += " WHERE " + " AND ".join(conditions)
-		
+
 		return self._fetch_all(query, tuple(params) if params else ())
 
 	def create_account(
@@ -306,7 +306,7 @@ class Database:
 		*,
 		_firstName: str | None = None,
 		_lastName: str | None = None,
-		_creationDate: datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+		_creationDate: datetime = datetime.now()
 	) -> int | None:
 		"""
 		Create a new account in the database.
@@ -322,21 +322,21 @@ class Database:
 		Returns:
 			Account ID of created account or None on error
 		"""
-		if _creationDate is None:
-			_creationDate = datetime.now()
+
+		creation_date_str = _creationDate.strftime("%Y-%m-%d %H:%M:%S")
 
 		if _firstName is not None and _lastName is not None:
 			query = '''
 				INSERT INTO Account (email, password, firstname, lastname, creationDate, role)
 				VALUES (%s, %s, %s, %s, %s, %s)
 			'''
-			params = (_email, _password, _firstName, _lastName, _creationDate, _role.value)
+			params = (_email, _password, _firstName, _lastName, creation_date_str, _role.value)
 		else:
 			query = '''
 				INSERT INTO Account (email, password, creationDate, role)
 				VALUES (%s, %s, %s, %s)
 			'''
-			params = (_email, _password, _creationDate, _role.value)
+			params = (_email, _password, creation_date_str, _role.value)
 
 		return self._execute(query, params, _returnLastId=True)
 
@@ -728,7 +728,7 @@ class Database:
 			WHERE reportID = %s
 		'''
 		return self._fetch_one(query, (_reportId,))
-	
+
 	# --- Utilities ---
 	def get_enum_values(self, tableName: str, columnName: str) -> list[str]:
 		"""
