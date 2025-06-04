@@ -4,6 +4,7 @@ from typing import Any, Generator
 
 import mariadb
 from fastapi import HTTPException, status
+
 from ..utils.settings import SETTINGS
 
 # TODO Currently _execute can return 3 types, dependent on parameters. This fuckery trickles to all code that uses this function.
@@ -174,7 +175,7 @@ class Database:
 			print(f'Unexpected error in fetchall: {e}')
 			return None
 
-	def _execute(self, _query: str, _params: tuple = (), /, *, _returnLastId: bool = False) -> bool | int | None:
+	def _execute(self, _query: str, _params: tuple = (), /, *, _returnLastId: bool = False) -> int | None:
 		"""
 		Execute a query that modifies data (INSERT, UPDATE, DELETE).
 
@@ -192,10 +193,10 @@ class Database:
 			affected_rows = self.cur.rowcount
 			self.commit()
 
-			if _returnLastId:
-				return self.cur.lastrowid if affected_rows > 0 else None
-			else:
-				return affected_rows > 0
+			if not _returnLastId:
+				return None
+
+			return self.cur.lastrowid if affected_rows > 0 else None
 
 		except mariadb.Error as e:
 			print(f'DB error in execute: {e}, rolling back')
@@ -203,7 +204,7 @@ class Database:
 				self.rollback()
 			except Exception as rollback_error:
 				print(f'Error during rollback: {rollback_error}')
-			return None if _returnLastId else False
+			return None
 
 		except Exception as e:
 			print(f'Unexpected error in execute: {e}, rolling back')
@@ -211,7 +212,7 @@ class Database:
 				self.rollback()
 			except Exception as rollback_error:
 				print(f'Error during rollback: {rollback_error}')
-			return None if _returnLastId else False
+			return None
 
 	# --- Account Management ---
 
@@ -341,7 +342,7 @@ class Database:
 		return self._execute(query, params, _returnLastId=True)
 
 	# NOTE Using dictonary args might be a bit fucky but it seems the best for the case.
-	def update_account(self, _accountId: int, /, **_fields) -> bool | int | None:
+	def update_account(self, _accountId: int, /, **_fields) -> int | None:
 		"""
 		Update account fields.
 
@@ -361,7 +362,7 @@ class Database:
 		query = f'UPDATE Account SET {set_clause} WHERE accountID = %s'
 		return self._execute(query, params)
 
-	def delete_accounts(self, _accountIds: list[int], /) -> bool | int | None:
+	def delete_accounts(self, _accountIds: list[int], /) -> int | None:
 		"""
 		Delete accounts from the database. Deleting an account deletes all associated addresses and the entry in the order will be set to null.
 
@@ -414,7 +415,7 @@ class Database:
 		'''
 		return self._fetch_all(query, (_accountId,))
 
-	def delete_address(self, _addressId: int, /) -> bool | int | None:
+	def delete_address(self, _addressId: int, /) -> int | None:
 		"""
 		Delete an address. Generally you want to avoid doing this. Deleting an account deletes all associated addresses and the entry in the order will be set to null.
 
@@ -490,7 +491,20 @@ class Database:
 		query = 'INSERT INTO Tag (name) VALUES (%s)'
 		return self._execute(query, (_name,), _returnLastId=True)
 
-	def add_tag_to_product(self, _tagId: int, _productId: int, /) -> bool | int | None:
+	def get_tag_id(self, _name: str, /):
+		query = 'SELECT tagID FROM `Tag` WHERE name = %s'
+		# TODO Return -1 if no tag with that name is found
+		return self._execute(query, (_name,))
+
+	def get_all_tags(self):
+		# TODO Use _fetch_all to get all tags
+		return
+
+	def delete_tag(self, _tagId: int, /):
+		# TODO
+		return
+
+	def add_tag_to_product(self, _tagId: int, _productId: int, /) -> int | None:
 		"""
 		Link a product to a tag.
 
@@ -504,9 +518,13 @@ class Database:
 		query = 'INSERT INTO `Product-Tag` (productID, tagID) VALUES (%s, %s)'
 		return self._execute(query, (_productId, _tagId))
 
+	def remove_tag_from_product(self, _tagId: int, _productId: int, /):
+		# TODO
+		return
+
 	# --- Image Management ---
 
-	def add_image_for_product(self, _url: str, _productId: int, /) -> int | None:
+	def add_image_to_product(self, _url: str, _productId: int, /) -> int | None:
 		"""
 		Create a new image and link it to a product.
 
@@ -529,7 +547,7 @@ class Database:
 
 		return None
 
-	# --- Trolley Management ---
+	# --- Trolley & Line Item Management ---
 
 	def get_trolley(self, _accountId: int, /) -> list[dict[str, Any]] | None:
 		"""
@@ -549,7 +567,7 @@ class Database:
 		'''
 		return self._fetch_all(query, (_accountId,)) or []
 
-	def add_to_trolley(self, _accountId: int, _productId: int, _quantity: int = 1, /) -> bool | int | None:
+	def add_to_trolley(self, _accountId: int, _productId: int, _quantity: int = 1, /) -> int | None:
 		"""
 		Add item to trolley.
 
@@ -572,7 +590,7 @@ class Database:
 
 		return False
 
-	def clear_trolley(self, _accountId: int, /) -> bool | int | None:
+	def clear_trolley(self, _accountId: int, /) -> int | None:
 		"""
 		Clear all items from trolley.
 
