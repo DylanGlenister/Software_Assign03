@@ -1,0 +1,159 @@
+<div id="customer" class="content-section">
+    <div class="section-header">
+        <h3>Customer Routes</h3>
+        <p>Customer registration and shopping cart management</p>
+    </div>
+
+    <!-- Register -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">POST</span>
+            <span>/customer/register</span>
+            <p class="endpoint-description">
+                Creates a customer account. <br>
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <div class="fake-data-section">
+                <h4>Sample Data</h4>
+                <button id="fillRegisterDataBtn" class="btn btn-secondary">Fill Sample Data</button>
+            </div>
+            
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Password</label>
+                    <input type="text" id="registerPassword" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Register</button>
+            </form>
+            <div id="registerResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
+            </div>
+        </div>
+    </div>
+
+    <!-- Get Trolley -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/customer/trolley</span>
+            <p class="endpoint-description">
+                <strong>CREATES A GUEST ACCOUNT IF NOT LOGGED IN</strong><br>
+                Gets the trolley of the current user. <br>
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <button id="getTrolleyBtn" class="btn btn-primary">Get Shopping Cart</button>
+            <div id="getTrolleyResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Table</strong></summary>
+                    <div class="table-container"></div><br>
+                </details>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear Trolley -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">POST</span>
+            <span>/customer/trolley/clear</span>
+            <p class="endpoint-description">
+                <strong>CREATES A GUEST ACCOUNT IF NOT LOGGED IN</strong><br>
+                Clears all the items from the trolley. <br>
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <p>Clear all items from the shopping cart.</p>
+            <button id="clearTrolleyBtn" class="btn btn-primary">Clear Cart</button>
+            <div id="clearTrolleyResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
+            </div>
+        </div>
+    </div>
+
+    <!-- Add to Trolley -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">POST</span>
+            <span>/customer/trolley/add</span>
+            <p class="endpoint-description">
+                <strong>CREATES A GUEST ACCOUNT IF NOT LOGGED IN</strong><br>
+                Adds x amount of the selected product to the trolley. <br>
+            </p>
+        </div>
+        <div class="endpoint-body">
+          
+            <form id="addToTrolleyForm">
+                <div class="form-group">
+                    <label for="addProductId">Product ID</label>
+                    <select id="addProductId" class="form-control">
+                        <option value="">Select product</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="addAmount">Amount</label>
+                    <input type="number" id="addAmount" class="form-control" value="1" min="1" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Add to Cart</button>
+            </form>
+            <div id="addToTrolleyResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
+            </div>
+        </div>
+    </div>
+
+    <!-- Remove from Trolley -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">POST</span>
+            <span>/customer/trolley/remove</span>
+            <p class="endpoint-description">
+                <strong>CREATES A GUEST ACCOUNT IF NOT LOGGED IN</strong><br>
+                Removes x amount of the selected product to the trolley. If more than the ammount of the item is removed, then the item is removed from the trolley. <br>
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <form id="removeFromTrolleyForm">
+                <div class="form-group">
+                    <label for="removeProductId">Product ID</label>
+                    <input type="number" id="removeProductId" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="removeAmount">Amount</label>
+                    <input type="number" id="removeAmount" class="form-control" value="1" min="1" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Remove from Cart</button>
+            </form>
+            <div id="removeFromTrolleyResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
+            </div>
+        </div>
+    </div>
+
+</div>

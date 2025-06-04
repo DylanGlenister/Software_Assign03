@@ -1,0 +1,38 @@
+<div id="employee" class="content-section">
+    <div class="section-header">
+        <h3>Employee Routes</h3>
+        <p>Management of products and reports</p>
+    </div>
+
+    <!-- Template -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">METHOD HERE</span>
+            <span>ENDPOINT HERE</span>
+            <p class="endpoint-description">
+                DESCRIPTION HERE
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <div class="fake-data-section">
+                <h4>AUTO FILL SAMPLE:</h4>
+                <button id="fillSampleButton" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">EXAMPLE</button>
+            </div>
+            
+            <form id="templateForm">
+                <div class="form-group">
+                    <label for="example">EXAMPLE</label>
+                    <input type="text" id="example" class="form-control"> <!---Add required if needed-->
+                </div>
+                <button type="submit" class="btn btn-primary">SUBMIT</button>
+            </form>
+            <div id="templateResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details> 
+            </div>
+        </div>
+    </div>
+</div>

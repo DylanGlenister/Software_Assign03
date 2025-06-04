@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from enum import Enum
 
 class Settings(BaseSettings):
     api_path: str
@@ -16,5 +17,9 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = 'utf-8'
+    
+    def reload_settings(self):
+        global SETTINGS
+        SETTINGS = Settings()
 
 SETTINGS = Settings()

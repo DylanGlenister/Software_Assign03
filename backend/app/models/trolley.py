@@ -1,4 +1,5 @@
-class Trolley: 
+
+class Trolley:
     def __init__(self):
         self.lineItems = []
 

@@ -1,22 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Optional
-from pydantic import BaseModel, EmailStr, constr
-from datetime import datetime, timezone
+from pydantic import BaseModel, EmailStr, constr, ValidationError
 
 from ..models.account import Account
-from .database import Database, get_db
+from .database import Database, get_db, Status, Role
 from ..utils.settings import SETTINGS
-from ..utils.token import create_token, decode_token, get_account_data, get_token, TokenData
+from ..utils.token import create_token, get_account_data
 
 account_route = APIRouter(prefix=SETTINGS.api_path + "/accounts", tags=["accounts"])
-
-def get_account(account_data: dict = Depends(get_account_data)) -> Account:
-    return Account(**account_data)
-     
 
 class LoginPayload(BaseModel):
 	email: EmailStr = "customer@example.com"
 	password: str = "password"
+
+class UpdateAccountPayload(BaseModel):
+    email: Optional[EmailStr]
+    status: Optional[Status]
+    firstname: Optional[str]
+    lastname: Optional[str]
+
+class ChangePasswordPayload(BaseModel):
+    new_password: constr(min_length=8)
+
+def get_account(account_data: dict = Depends(get_account_data)) -> Account:
+	return Account(**account_data)
 
 @account_route.post("/login")
 def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
@@ -25,11 +32,11 @@ def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
 	if not account:
 		return {"message": "Invalid credentials"}
 	
-	if account.status_ID != 1:
+	if account.status in ["inactive", "condemned"]:
 		return {"message": "This account is inactive"}
 
 	if account:
-		token: str = create_token({"email": account.email, "role_ID": account.role_ID, "account_ID": account.account_ID, "status_ID": account.status_ID})
+		token: str = create_token({"email": account.email, "role": account.role, "accountID": account.accountID, "status": account.status})
 		return {
 			"message": "Login successful", 
 			"email": account.email,
@@ -39,52 +46,27 @@ def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
 				}
 			}
 
-@account_route.post("/tokenInfo")
-def token_info(token: str = Depends(get_token)):
-    token_data: TokenData = decode_token(token)
-    if not token_data:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    if not token_data.exp:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Token does not contain expiration"
-        )
-
-    expire_time = datetime.fromtimestamp(token_data.exp, tz=timezone.utc)
-    now = datetime.now(timezone.utc)
-    time_remaining = expire_time - now
-
-    return {
-        "expires_at": expire_time.isoformat(),
-        "time_remaining": str(time_remaining),
-        "time_remaining_seconds": time_remaining.total_seconds(),
-        "data": token_data.model_dump()
-    }
-
-class UpdateAccountPayload(BaseModel):
-    email: Optional[EmailStr]
-    status_ID: Optional[int] = 1
-
 @account_route.put("/update")
 def update_account(payload: UpdateAccountPayload, account: Account = Depends(get_account), db: Database = Depends(get_db)):
-    account.verify_perms(db, [1,2,3]) # Dont allow guests to update their account
+	if not account.verify_perms([Role.GUEST], True):  # Dont allow guests to update their account
+		raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Guests cannot update their accounts. Please log in")
 
-    result = account.update_info(db, **payload.model_dump(exclude_unset=True))
-    if isinstance(result, dict) and result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    return {"message": "Account updated successfully"}
-
-class ChangePasswordPayload(BaseModel):
-    new_password: constr(min_length=8)
+	result = account.update_info(db, **payload.model_dump(exclude_unset=True))
+	if isinstance(result, dict) and result.get("error"):
+		raise HTTPException(status_code=400, detail=result["error"])
+	return {"message": "Account updated successfully"}
 
 @account_route.put("/changePassword")
 def change_password(payload: ChangePasswordPayload, account: Account = Depends(get_account), db: Database = Depends(get_db)):
-    account.verify_perms(db, [1,2,3]) # Dont allow guests to update their password
+	if account.verify_perms(["guest"], True):  # Dont allow guests to update their account
+		raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Guests cannot update their accounts. Please log in")
 
-    result = account.change_password(db, payload.new_password)
-    if isinstance(result, dict) and result.get("error"):
-        raise HTTPException(status_code=400, detail=result["error"])
-    if not result:
-        raise HTTPException(status_code=500, detail="Failed to change password")
-    return {"message": "Password changed successfully"}
+	try:
+		result = account.change_password(db, payload.new_password)
+	except ValueError as e:
+		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+	if not result:
+		raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to change password")
+
+	return {"message": "Password changed successfully"}

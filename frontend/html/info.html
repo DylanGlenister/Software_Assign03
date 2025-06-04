@@ -1,0 +1,76 @@
+<div id="info" class="content-section">
+    <div class="section-header">
+        <h3>Welcome to the SWE30003 Demo Interface!</h3>
+        <p>A testing ground for all the functions we have maded for the site</p>
+    </div>
+
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <h4>About</h4>
+        </div>
+        <div class="endpoint-body">
+            <p>This interface allows you to test all the aspects of our implementation easily.</p>
+            <p>Use the sidebar to switch between different routes that would be used in our implementation of the online store</p>
+        </div>
+    </div>
+
+    <div class="endpoint-card">
+        <div class="endpoint-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h4>System Health Status</h4>
+            <button id="refreshHealthBtn" class="btn btn-secondary btn-sm">Refresh</button>
+        </div>
+        <div class="endpoint-body">
+            <div class="grid">
+                <div>
+                    <h5>Backend Health (API):</h5>
+                    <div id="backendHealthStatus" class="health-status-box">Loading...</div>
+                </div>
+                <div>
+                    <h5>Database Health:</h5>
+                    <div id="databaseHealthStatus" class="health-status-box">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <h4>Route Info</h4>
+        </div>
+        <div class="endpoint-body">
+            <ol>
+                <li>
+                    <strong><a href="#" class="nav-link" data-section="accounts">Account Routes</a>:</strong> 
+                    <p>This area displays the shared functionality of all types of accounts including logging in, updating the email and status, and changing your password.</p>
+                    <p>The login section in account has 3 buttons which has some sample data of the 3 accounts already setup in our database by default so you can test the functionality of each route simply.</p>
+                </li>
+                <br>
+                <li>
+                    <strong><a href="#" class="nav-link" data-section="customer">Customer Routes</a>:</strong> 
+                    <p>WIP</p>
+                </li>
+                <br>
+                <li>
+                    <strong><a href="#" class="nav-link" data-section="employee">Employee Routes</a>:</strong> 
+                    <p>WIP</p>
+                </li>
+                <br>
+                <li>
+                    <strong><a href="#" class="nav-link" data-section="admin">Admin Routes</a>:</strong> 
+                    <p>WIP</p>
+                </li>
+                <br>
+                <li>
+                    <strong><a href="#" class="nav-link" data-section="other">Other Routes</a>:</strong> 
+                    <p>WIP</p>
+                </li>
+                <br>
+                <li>
+                    <strong><a href="#" class="nav-link" data-section="config">Config</a>:</strong> 
+                    <p>The config tab has the api url set so you can change if the backend needs to run on a different port.</p>
+                    <p>It also contains a section for token management, where you can see the JWT token's data, as well as clear it (to simulate logging out)</p>
+                </li>
+            </ol>
+        </div>
+    </div>
+</div>
