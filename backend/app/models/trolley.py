@@ -1,17 +1,21 @@
+from .core.database import Database
+from .product import Product
+from .lineitem import LineItem
 
 class Trolley:
-    def __init__(self):
+    def __init__(self, db: Database, accountID: int):
         self.lineItems = []
 
-    def addLineItem(self, product):
+    def addLineItem(self, productID):
         quantity = 1
         for lineItem in self.lineItems:
-            if lineItem.product.productID == product.poroductID:
+            if lineItem.productID == productID:
                 lineItem.quantity += quantity
                 return
-        self.lineItems.append(lineItem(product, quantity))
+        self.lineItems.append(lineItem(productID, quantity))
+        return
     
-    def UpdateQuantity(self, productID, newQuantity):
+    def UpdateQuantity(self, lineItem: LineItem, newQuantity: int):
         for lineItem in self.lineItems:
             if newQuantity <= 0:
                 self.lineItems.remove(lineItem)
@@ -21,7 +25,7 @@ class Trolley:
         return False
     
     def totalCost(self):
-        return sum(lineItem.price for lineItem in self.LineItems)
+        return sum(lineItem.priceAtPurchase for lineItem in self.LineItems)
     
     def getLineItems(self):
         return
