@@ -5,7 +5,7 @@ from typing import Any, Generator, TypeAlias
 import mariadb
 from fastapi import HTTPException, status
 
-from ..utils.settings import SETTINGS
+#from ..utils.settings import SETTINGS
 
 
 class MockSettings:
@@ -17,8 +17,10 @@ class MockSettings:
 
 SETTINGS = MockSettings()
 
-# Type alias for database row representation
+# Type aliases
 DictRow: TypeAlias = dict[str, Any]
+Id: TypeAlias = int
+
 
 class Role(Enum):
 	"""
@@ -56,7 +58,7 @@ class Database:
 			return
 		try:
 			print(cls.__pool)
-			print(f"Attempting to create connection pool for database '{SETTINGS.database}' on {SETTINGS.database_host}:{SETTINGS.database_port}")
+			print(f'Attempting to create connection pool for database \'{SETTINGS.database}\' on {SETTINGS.database_host}:{SETTINGS.database_port}')
 			cls.__pool = mariadb.ConnectionPool(
 				pool_name='mypool',
 				pool_size=5,
@@ -68,14 +70,14 @@ class Database:
 			)
 			print('Connection pool created successfully')
 		except mariadb.Error as e:
-			print(f"Error creating connection pool: {e}")
+			print(f'Error creating connection pool: {e}')
 			error_message_lower = str(e).lower()
-			is_access_denied = "access denied" in error_message_lower or (hasattr(e, 'errno') and e.errno == 1045)
+			is_access_denied = 'access denied' in error_message_lower or (hasattr(e, 'errno') and e.errno == 1045)
 
 			if is_access_denied:
-				detail_message = f"Database pool initialization failed: Access Denied. Check credentials. (Error: {e})"
+				detail_message = f'Database pool initialization failed: Access Denied. Check credentials. (Error: {e})'
 			else:
-				detail_message = f"Database pool initialization failed: {e}"
+				detail_message = f'Database pool initialization failed: {e}'
 
 			raise HTTPException(
 				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -98,16 +100,16 @@ class Database:
 			cls.initialize_pool()
 
 		try:
-			assert cls.__pool is not None, "Connection pool is not initialized"
+			assert cls.__pool is not None, 'Connection pool is not initialized'
 			return cls.__pool.get_connection()
 		except mariadb.Error as e:
-			print(f"Error getting connection from pool: {e}")
+			print(f'Error getting connection from pool: {e}')
 			raise HTTPException(
 				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-				detail=f"Failed to get connection from database pool: {e}"
+				detail=f'Failed to get connection from database pool: {e}'
 			)
 		except AssertionError as e:
-			print(f"Assertion error: {e}")
+			print(f'Assertion error: {e}')
 			raise HTTPException(
 				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 				detail=str(e)
@@ -122,22 +124,45 @@ class Database:
 		"""
 		self.conn: mariadb.Connection = _conn
 		self.cur: mariadb.Cursor = _conn.cursor()
+		self.conn.autocommit = False # Ensure autocommit is off for manual transaction control
 
 	def close(self):
 		"""Closes the database cursor and connection."""
 		if hasattr(self, 'cur') and self.cur:
 			self.cur.close()
 		if hasattr(self, 'conn') and self.conn:
-			self.conn.close()
-		print("Database connection closed.")
+			# Rollback any pending transaction if the connection is closed without explicit commit/rollback
+			try:
+				if self.conn.is_connected() and not self.conn.autocommit: # Check if in transaction
+					# This check might be tricky depending on driver specifics for "in transaction"
+					# A simple check is if there are uncommitted changes, but that's hard to query directly.
+					# For now, we assume if autocommit is off, any operation might have started a transaction.
+					# A more robust way is to track transaction state within the class if needed.
+					# self.conn.rollback() # Potentially rollback if not committed
+					pass # Let get_db handle final rollback on close if needed
+			except mariadb.Error as e:
+				print(f'Error during implicit rollback on close: {e}')
+			finally:
+				self.conn.close()
+		print('Database connection closed.')
+
 
 	def commit(self):
 		"""Commits the current transaction."""
-		self.conn.commit()
+		try:
+			self.conn.commit()
+		except mariadb.Error as e:
+			print(f'Error during commit: {e}')
+			raise # Re-raise the error to be handled by the caller or get_db
 
 	def rollback(self):
 		"""Rolls back the current transaction."""
-		self.conn.rollback()
+		try:
+			self.conn.rollback()
+		except mariadb.Error as e:
+			print(f'Error during rollback: {e}')
+			# Don't typically re-raise here as rollback is often in an except block already
+			# However, the caller might want to know if rollback failed.
 
 	# --- Internal query helpers ---
 
@@ -164,6 +189,7 @@ class Database:
 
 		except mariadb.Error as e:
 			print(f'DB error in _fetch_one: {e}')
+			# Do not rollback here, as this is a read operation
 			return None
 		except Exception as e:
 			print(f'Unexpected error in _fetch_one: {e}')
@@ -178,8 +204,8 @@ class Database:
 			_params: A tuple of parameters for the query.
 
 		Returns:
-			A list of dictionaries representing the rows, or None if no rows are found or an error occurs.
-			Returns an empty list if the query executes successfully but yields no rows.
+			A list of dictionaries representing the rows, or an empty list if no rows are found.
+			Returns None if a database error occurs.
 		"""
 		try:
 			self.cur.execute(_query, _params)
@@ -198,50 +224,36 @@ class Database:
 			print(f'Unexpected error in _fetch_all: {e}')
 			return None
 
-	def _execute(self, _query: str, _params: tuple = (), /, *, _returnLastId: bool = False) -> int | None:
+	def _execute(self, _query: str, _params: tuple = (), /, *, _returnLastId: bool = False) -> int | Id | None:
 		"""
-		Executes a given SQL query (INSERT, UPDATE, DELETE).
+		Executes a given SQL query (INSERT, UPDATE, DELETE) without committing or rolling back.
+		The calling public method is responsible for transaction management.
 
 		Args:
 			_query: The SQL query string.
 			_params: A tuple of parameters for the query.
-			_returnLastId: If True, returns the last inserted row ID (for INSERT statements). Otherwise, returns the number of affected rows.
+			_returnLastId: If True, returns the last inserted row ID. Otherwise, returns the number of affected rows.
 
 		Returns:
-			The last inserted row ID if _returnLastId is True and insert was successful.
-			The number of affected rows for other operations (INSERT, UPDATE, DELETE).
-			None if a database error occurs, or if _returnLastId is True and no row was inserted/affected.
+			The last inserted row ID (as Id) if _returnLastId is True and insert was successful.
+			The number of affected rows for other operations.
+			None if _returnLastId is True and no row was inserted/affected.
+			Raises mariadb.Error on database execution errors.
 		"""
-		try:
-			self.cur.execute(_query, _params)
-			affected_rows: int = self.cur.rowcount
-			self.commit()
+		self.cur.execute(_query, _params)
+		affected_rows: int = self.cur.rowcount
 
-			if _returnLastId:
-				# lastrowid is only meaningful if rows were affected (e.g. an insert happened)
-				return self.cur.lastrowid if affected_rows > 0 and self.cur.lastrowid is not None else None
-			return affected_rows
-		except mariadb.Error as e:
-			print(f'DB error in _execute: {e}, rolling back')
-			try:
-				self.rollback()
-			except Exception as rollback_error:
-				print(f'Error during rollback: {rollback_error}')
-			return None
-		except Exception as e:
-			print(f'Unexpected error in _execute: {e}, rolling back')
-			try:
-				self.rollback()
-			except Exception as rollback_error:
-				print(f'Error during rollback: {rollback_error}')
-			return None
+		if _returnLastId:
+			return self.cur.lastrowid if affected_rows > 0 and self.cur.lastrowid is not None else None
+		return affected_rows
+
 
 	# --- Account Management ---
 
 	def get_account(
 		self,
 		*,
-		_accountId: int | None = None,
+		_accountId: Id | None = None,
 		_email: str | None = None
 	) -> DictRow | None:
 		"""
@@ -261,9 +273,9 @@ class Database:
 		args_num = sum(x is not None for x in [_accountId, _email])
 
 		if args_num == 0:
-			raise ValueError("Must provide exactly one of: _accountId or _email")
+			raise ValueError('Must provide exactly one of: _accountId or _email')
 		elif args_num > 1:
-			raise ValueError("Keyword arguments _accountId and _email are mutually exclusive")
+			raise ValueError('Keyword arguments _accountId and _email are mutually exclusive')
 
 		if _accountId is not None:
 			query = '''
@@ -293,9 +305,9 @@ class Database:
 		Retrieves multiple accounts based on optional filtering criteria.
 
 		Args:
-			role: Filter accounts by role.
-			status: Filter accounts by status.
-			olderThanDays: Filter accounts created earlier than this many days ago.
+			_role: Filter accounts by role.
+			_status: Filter accounts by status.
+			_olderThanDays: Filter accounts created earlier than this many days ago.
 
 		Returns:
 			A list of dictionaries, each representing an account, or None if an error occurs.
@@ -306,24 +318,24 @@ class Database:
 			FROM Account
 		'''
 		conditions: list[str] = []
-		params: list[Any] = []
+		params_list: list[Any] = []
 
 		if _role is not None:
-			conditions.append("role = %s")
-			params.append(_role.value)
+			conditions.append('role = %s')
+			params_list.append(_role.value)
 
 		if _status is not None:
-			conditions.append("status = %s")
-			params.append(_status.value)
+			conditions.append('status = %s')
+			params_list.append(_status.value)
 
 		if _olderThanDays is not None:
-			conditions.append("creationDate < DATE_SUB(CURDATE(), INTERVAL %s DAY)")
-			params.append(_olderThanDays)
+			conditions.append('creationDate < DATE_SUB(CURDATE(), INTERVAL %s DAY)')
+			params_list.append(_olderThanDays)
 
 		if conditions:
-			query += " WHERE " + " AND ".join(conditions)
+			query += ' WHERE ' + ' AND '.join(conditions)
 
-		return self._fetch_all(query, tuple(params))
+		return self._fetch_all(query, tuple(params_list))
 
 	def create_account(
 		self,
@@ -335,7 +347,7 @@ class Database:
 		_lastName: str | None = None,
 		*,
 		_creationDate: datetime = datetime.now()
-	) -> int | None:
+	) -> Id | None:
 		"""
 		Creates a new account.
 
@@ -350,19 +362,22 @@ class Database:
 		Returns:
 			The accountID of the newly created account, or None if creation failed.
 		"""
-		creation_date_str = _creationDate.strftime("%Y-%m-%d %H:%M:%S")
-
-		# Always include all fields, using NULL for optional ones if not provided
+		creation_date_str = _creationDate.strftime('%Y-%m-%d %H:%M:%S')
 		query = '''
 			INSERT INTO Account (email, password, firstname, lastname, creationDate, role)
 			VALUES (%s, %s, %s, %s, %s, %s)
 		'''
 		params = (_email, _password, _firstName, _lastName, creation_date_str, _role.value)
+		try:
+			account_id = self._execute(query, params, _returnLastId=True)
+			self.commit()
+			return account_id
+		except Exception as e:
+			print(f'Error in create_account: {e}')
+			self.rollback()
+			raise # Re-raise the exception to be handled by the caller or get_db
 
-		return self._execute(query, params, _returnLastId=True)
-
-	# NOTE Using dictonary args might be a bit fucky but it seems the best for the case.
-	def update_account(self, _accountId: int, /, **_fields) -> int | None:
+	def update_account(self, _accountId: Id, /, **_fields: Any) -> int | None:
 		"""
 		Updates specified fields for an existing account.
 
@@ -373,16 +388,17 @@ class Database:
 					 'creationDate' and 'accountID' cannot be updated via this method.
 
 		Returns:
-			The number of affected rows (should be 1 if successful, 0 if no change or not found),
-			or None if an error occurred or no valid fields were provided.
+			The number of affected rows (should be 1 if successful, 0 if no change or not found).
+
+		Raises:
+			ValueError: If no valid fields to update are provided.
 		"""
 		allowed_fields = {'email', 'password', 'firstname', 'lastname', 'role', 'status'}
 		valid_fields = {k: v for k, v in _fields.items() if k in allowed_fields}
 
 		if not valid_fields:
-			raise ValueError("No valid fields to update")
+			raise ValueError('No valid fields to update')
 
-		# Convert Enum values if present
 		if 'role' in valid_fields and isinstance(valid_fields['role'], Role):
 			valid_fields['role'] = valid_fields['role'].value
 		if 'status' in valid_fields and isinstance(valid_fields['status'], Status):
@@ -390,32 +406,44 @@ class Database:
 
 		set_clause = ', '.join(f'{key} = %s' for key in valid_fields)
 		params = tuple(valid_fields.values()) + (_accountId,)
-
 		query = f'UPDATE Account SET {set_clause} WHERE accountID = %s'
-		return self._execute(query, params)
 
-	def delete_accounts(self, _accountIds: set[int], /) -> int | None:
+		try:
+			affected_rows = self._execute(query, params)
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in update_account: {e}')
+			self.rollback()
+			raise
+
+	def delete_accounts(self, _accountIds: set[Id], /) -> int | None:
 		"""
 		Deletes one or more accounts by their IDs.
-		Deleting an account deletes all associated addresses and the entry in the order will be set to null.
 
 		Args:
 			_accountIds: A set of account IDs to delete.
 
 		Returns:
-			The number of accounts successfully deleted, or None if an error occurred.
-			Returns 0 if _accountIds is empty.
+			The number of accounts successfully deleted. Returns 0 if _accountIds is empty.
 		"""
 		if not _accountIds:
 			return 0
 
 		placeholders = ', '.join(['%s'] * len(_accountIds))
 		query = f'DELETE FROM Account WHERE accountID IN ({placeholders})'
-		return self._execute(query, tuple(_accountIds))
+		try:
+			affected_rows = self._execute(query, tuple(_accountIds))
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in delete_accounts: {e}')
+			self.rollback()
+			raise
 
 	# --- Address Management ---
 
-	def create_address(self, _accountId: int, _location: str, /) -> int | None:
+	def create_address(self, _accountId: Id, _location: str, /) -> Id | None:
 		"""
 		Creates a new address for a given account.
 
@@ -424,15 +452,22 @@ class Database:
 			_location: The location description of the address.
 
 		Returns:
-			The addressID of the newly created address, or None if creation failed.
+			The addressID of the newly created address.
 		"""
 		query = '''
 			INSERT INTO Address (accountID, location)
 			VALUES (%s, %s)
 		'''
-		return self._execute(query, (_accountId, _location), _returnLastId=True)
+		try:
+			address_id = self._execute(query, (_accountId, _location), _returnLastId=True)
+			self.commit()
+			return address_id
+		except Exception as e:
+			print(f'Error in create_address: {e}')
+			self.rollback()
+			raise
 
-	def get_addresses(self, _accountId: int, /) -> list[DictRow] | None:
+	def get_addresses(self, _accountId: Id, /) -> list[DictRow] | None:
 		"""
 		Retrieves all addresses associated with a given account.
 
@@ -440,8 +475,7 @@ class Database:
 			_accountId: The ID of the account.
 
 		Returns:
-			A list of dictionaries, each representing an address, or None if an error occurs.
-			Returns an empty list if the account has no addresses.
+			A list of dictionaries, each representing an address. Returns empty list if none.
 		"""
 		query = '''
 			SELECT addressID, accountID, location
@@ -450,7 +484,7 @@ class Database:
 		'''
 		return self._fetch_all(query, (_accountId,))
 
-	def modify_address(self, _addressId: int, _location: str, /) -> int | None:
+	def modify_address(self, _addressId: Id, _location: str, /) -> int | None:
 		"""
 		Modifies the location of an existing address.
 
@@ -459,12 +493,19 @@ class Database:
 			_location: The new location description.
 
 		Returns:
-			The number of affected rows (1 if successful, 0 if not found), or None on error.
+			The number of affected rows (1 if successful, 0 if not found).
 		"""
 		query = 'UPDATE Address SET location = %s WHERE addressID = %s'
-		return self._execute(query, (_location, _addressId))
+		try:
+			affected_rows = self._execute(query, (_location, _addressId))
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in modify_address: {e}')
+			self.rollback()
+			raise
 
-	def delete_address(self, _addressId: int, /) -> int | None:
+	def delete_address(self, _addressId: Id, /) -> int | None:
 		"""
 		Deletes an address by its ID.
 
@@ -472,10 +513,17 @@ class Database:
 			_addressId: The ID of the address to delete.
 
 		Returns:
-			The number of affected rows (1 if successful), or None on error.
+			The number of affected rows (1 if successful).
 		"""
 		query = 'DELETE FROM Address WHERE addressID = %s'
-		return self._execute(query, (_addressId,))
+		try:
+			affected_rows = self._execute(query, (_addressId,))
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in delete_address: {e}')
+			self.rollback()
+			raise
 
 	# --- Product Management ---
 
@@ -483,14 +531,14 @@ class Database:
 		self,
 		_name: str,
 		_description: str,
-		_price: float,
-		_stock: int,
-		_available: int,
+		_price: float = 9999999999,
 		/,
+		_stock: int = 0,
+		_available: int = 0,
 		*,
-		_creationDate: datetime | None = None,
+		_creationDate: datetime = datetime.now(),
 		_discontinued: bool = False
-	) -> int | None:
+	) -> Id | None:
 		"""
 		Adds a new product to the database.
 
@@ -498,16 +546,15 @@ class Database:
 			_name: Name of the product.
 			_description: Description of the product.
 			_price: Price of the product.
-			_stock: Current quantity in stock.
-			_available: Quantity available for purchase.
+			_stock: Current quantity in stock (defaults to 0).
+			_available: Quantity available for purchase (defaults to 0).
 			_creationDate: Date of product creation (defaults to now).
 			_discontinued: Whether the product is discontinued (defaults to False).
 
 		Returns:
-			The productID of the newly added product, or None if addition failed.
+			The productID of the newly added product.
 		"""
-		creation_date_to_use = _creationDate if _creationDate is not None else datetime.now()
-		creation_date_str = creation_date_to_use.strftime("%Y-%m-%d %H:%M:%S")
+		creation_date_str = _creationDate.strftime('%Y-%m-%d %H:%M:%S')
 		discontinued_int = 1 if _discontinued else 0
 
 		query = '''
@@ -515,9 +562,16 @@ class Database:
 			VALUES (%s, %s, %s, %s, %s, %s, %s)
 		'''
 		params = (_name, _description, _price, _stock, _available, creation_date_str, discontinued_int)
-		return self._execute(query, params, _returnLastId=True)
+		try:
+			product_id = self._execute(query, params, _returnLastId=True)
+			self.commit()
+			return product_id
+		except Exception as e:
+			print(f'Error in add_product: {e}')
+			self.rollback()
+			raise
 
-	def get_product(self, _productId: int) -> DictRow | None:
+	def get_product(self, _productId: Id) -> DictRow | None:
 		"""
 		Retrieves a single product by its ID.
 
@@ -534,7 +588,7 @@ class Database:
 		'''
 		return self._fetch_one(query, (_productId,))
 
-	def update_product(self, _productId: int, /, **_fields) -> int | None:
+	def update_product(self, _productId: Id, /, **_fields: Any) -> int | None:
 		"""
 		Updates specified fields for an existing product.
 
@@ -542,29 +596,32 @@ class Database:
 			_productId: The ID of the product to update.
 			_fields: Keyword arguments for fields to update.
 					 Allowed fields: 'name', 'description', 'price', 'stock', 'available', 'discontinued'.
-					 'creationDate' and 'productID' cannot be updated.
 
 		Returns:
-			The number of affected rows (1 if successful, 0 if no change or not found),
-			or None if an error occurred or no valid fields were provided.
+			The number of affected rows.
 		"""
 		allowed_fields = {'name', 'description', 'price', 'stock', 'available', 'discontinued'}
 		valid_fields = {k: v for k, v in _fields.items() if k in allowed_fields}
 
 		if not valid_fields:
-			print("No valid fields provided for update_product.")
-			return 0
+			raise ValueError('No valid fields provided for update_product.')
 
-		if 'discontinued' in valid_fields: # Ensure boolean is converted to int
+		if 'discontinued' in valid_fields:
 			valid_fields['discontinued'] = 1 if valid_fields['discontinued'] else 0
 
 		set_clause = ', '.join(f'{key} = %s' for key in valid_fields)
 		params = tuple(valid_fields.values()) + (_productId,)
-
 		query = f'UPDATE Product SET {set_clause} WHERE productID = %s'
-		return self._execute(query, params)
+		try:
+			affected_rows = self._execute(query, params)
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in update_product: {e}')
+			self.rollback()
+			raise
 
-	def set_product_discontinued(self, _productId: int, _state: bool = True, /) -> int | None:
+	def set_product_discontinued(self, _productId: Id, _state: bool = True, /) -> int | None:
 		"""
 		Sets the discontinued status of a product.
 
@@ -573,13 +630,20 @@ class Database:
 			_state: True to mark as discontinued, False to mark as not discontinued.
 
 		Returns:
-			The number of affected rows (1 if successful), or None on error.
+			The number of affected rows.
 		"""
 		discontinued_int = 1 if _state else 0
 		query = 'UPDATE Product SET discontinued = %s WHERE productID = %s'
-		return self._execute(query, (discontinued_int, _productId))
+		try:
+			affected_rows = self._execute(query, (discontinued_int, _productId))
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in set_product_discontinued: {e}')
+			self.rollback()
+			raise
 
-	def get_product_images(self, _productId: int, /) -> list[str] | None:
+	def get_product_images(self, _productId: Id, /) -> list[str] | None:
 		"""
 		Retrieves all image URLs for a given product.
 
@@ -587,8 +651,7 @@ class Database:
 			_productId: The ID of the product.
 
 		Returns:
-			A list of image URLs, or None if an error occurs.
-			Returns an empty list if the product has no images or product not found.
+			A list of image URLs. Returns empty list if none.
 		"""
 		query = '''
 			SELECT i.url
@@ -597,8 +660,8 @@ class Database:
 			WHERE pi.productID = %s
 		'''
 		result = self._fetch_all(query, (_productId,))
-		if result is None: # Error case
-			return None
+		if result is None:
+			return None # Error case from _fetch_all
 		return [row['url'] for row in result]
 
 	def get_products(self, _tags: list[str] | None = None, /) -> list[DictRow] | None:
@@ -610,17 +673,17 @@ class Database:
 			_tags: A list of tag names to filter by.
 
 		Returns:
-			A list of dictionaries, each representing a product, or None if an error occurs.
-			Returns an empty list if no products match.
+			A list of dictionaries, each representing a product. Returns empty list if none.
 		"""
-		if not _tags: # No tags provided, get all products
+		if not _tags:
 			query = '''
 				SELECT productID, name, description, price, stock, available, creationDate, discontinued
 				FROM Product
 			'''
 			params = ()
 		else:
-			placeholders = ', '.join(['%s'] * len(_tags))
+			num_tags = len(_tags)
+			placeholders = ', '.join(['%s'] * num_tags)
 			query = f'''
 				SELECT p.productID, p.name, p.description, p.price,
 					   p.stock, p.available, p.creationDate, p.discontinued
@@ -628,43 +691,49 @@ class Database:
 				JOIN `Product-Tag` pt ON p.productID = pt.productID
 				JOIN `Tag` t ON pt.tagID = t.tagID
 				WHERE t.name IN ({placeholders})
-				GROUP BY p.productID, p.name, p.description, p.price, p.stock, p.available, p.creationDate, p.discontinued
+				GROUP BY p.productID
 				HAVING COUNT(DISTINCT t.tagID) = %s
 			'''
-			params = tuple(_tags) + (len(_tags),)
+			params = tuple(_tags) + (num_tags,)
+		return self._fetch_all(query, params)
+
+	def get_products_with_tagIDs(self, _tagIds: set[Id] | None = None, /) -> list[DictRow] | None:
+		"""
+		Retrieves products. If tag IDs are provided, retrieves products matching ALL specified tag IDs.
+		If no tag IDs are provided (None or empty set), retrieves all products.
+
+		Args:
+			_tagIds: A set of tag IDs to filter by. Can be None or empty to get all products.
+
+		Returns:
+			A list of dictionaries, each representing a product. Returns empty list if no products match.
+			Returns None if a database error occurs.
+		"""
+		if not _tagIds:
+			query = '''
+				SELECT productID, name, description, price, stock, available, creationDate, discontinued
+				FROM Product
+			'''
+			params = ()
+		else:
+			num_tags = len(_tagIds)
+			placeholders = ', '.join(['%s'] * num_tags)
+			query = f'''
+				SELECT p.productID, p.name, p.description, p.price,
+						p.stock, p.available, p.creationDate, p.discontinued
+				FROM Product p
+				JOIN `Product-Tag` pt ON p.productID = pt.productID
+				WHERE pt.tagID IN ({placeholders})
+				GROUP BY p.productID, p.name, p.description, p.price, p.stock, p.available, p.creationDate, p.discontinued
+				HAVING COUNT(DISTINCT pt.tagID) = %s
+			'''
+			params = tuple(_tagIds) + (num_tags,)
 
 		return self._fetch_all(query, params)
 
-	def get_products_with_tagIDs(self, _tagIds: set[int], /) -> list[DictRow] | None:
-		"""
-		Retrieves products that have at least one of the specified tag IDs.
-
-		Args:
-			_tagIds: A set of tag IDs. Must not be empty.
-
-		Returns:
-			A list of dictionaries, each representing a product, or None if an error occurs.
-			Returns an empty list if no products match.
-
-		Raises:
-			ValueError: If _tagIds is empty.
-		"""
-		if not _tagIds:
-			raise ValueError("At least one tagID must be supplied for get_products_with_tagIDs.")
-
-		placeholders = ','.join(['%s'] * len(_tagIds))
-		query = f'''
-			SELECT DISTINCT p.productID, p.name, p.description, p.price,
-							p.stock, p.available, p.creationDate, p.discontinued
-			FROM Product p
-			JOIN `Product-Tag` pt ON p.productID = pt.productID
-			WHERE pt.tagID IN ({placeholders})
-		'''
-		return self._fetch_all(query, tuple(_tagIds))
-
 	# --- Tag Management ---
 
-	def create_tag(self, _name: str, /) -> int | None:
+	def create_tag(self, _name: str, /) -> Id | None:
 		"""
 		Creates a new tag.
 
@@ -672,16 +741,23 @@ class Database:
 			_name: The name of the tag.
 
 		Returns:
-			The tagID of the newly created tag, or None if creation failed (e.g., duplicate name).
+			The tagID of the newly created tag.
 		"""
 		query = 'INSERT INTO Tag (name) VALUES (%s)'
 		try:
-			return self._execute(query, (_name,), _returnLastId=True)
-		except mariadb.IntegrityError: # Handles duplicate name if 'name' has a UNIQUE constraint
-			print(f"Tag with name '{_name}' likely already exists.")
-			return None
+			tag_id = self._execute(query, (_name,), _returnLastId=True)
+			self.commit()
+			return tag_id
+		except mariadb.IntegrityError:
+			self.rollback() # Rollback if integrity error (e.g. duplicate name)
+			print(f'Tag with name \'{_name}\' likely already exists.')
+			raise # Re-raise to signal failure
+		except Exception as e:
+			print(f'Error in create_tag: {e}')
+			self.rollback()
+			raise
 
-	def get_tag_id(self, _name: str, /) -> int | None:
+	def get_tag_id(self, _name: str, /) -> Id | None:
 		"""
 		Retrieves the ID of a tag by its name.
 
@@ -700,13 +776,12 @@ class Database:
 		Retrieves all tags from the database.
 
 		Returns:
-			A list of dictionaries, each representing a tag (tagID, name), or None on error.
-			Returns an empty list if no tags exist.
+			A list of dictionaries, each representing a tag (tagID, name). Returns empty list if none.
 		"""
 		query = 'SELECT tagID, name FROM Tag'
 		return self._fetch_all(query)
 
-	def delete_tag(self, _tagId: int, /) -> int | None:
+	def delete_tag(self, _tagId: Id, /) -> int | None:
 		"""
 		Deletes a tag by its ID. Associated entries in Product-Tag will be cascade deleted.
 
@@ -714,12 +789,19 @@ class Database:
 			_tagId: The ID of the tag to delete.
 
 		Returns:
-			The number of affected rows (1 if successful), or None on error.
+			The number of affected rows (1 if successful).
 		"""
 		query = 'DELETE FROM Tag WHERE tagID = %s'
-		return self._execute(query, (_tagId,))
+		try:
+			affected_rows = self._execute(query, (_tagId,))
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in delete_tag: {e}')
+			self.rollback()
+			raise
 
-	def add_tag_to_product(self, _productId: int, _tagId: int, /) -> int | None:
+	def add_tag_to_product(self, _productId: Id, _tagId: Id, /) -> int | None:
 		"""
 		Associates a tag with a product.
 
@@ -728,16 +810,23 @@ class Database:
 			_tagId: The ID of the tag.
 
 		Returns:
-			The number of affected rows (1 if successful), or None on error (e.g. duplicate entry).
+			The number of affected rows (1 if successful).
 		"""
 		query = 'INSERT INTO `Product-Tag` (productID, tagID) VALUES (%s, %s)'
 		try:
-			return self._execute(query, (_productId, _tagId))
+			affected_rows = self._execute(query, (_productId, _tagId))
+			self.commit()
+			return affected_rows
 		except mariadb.IntegrityError:
-			print(f"Product {_productId} already has tag {_tagId} or one of the IDs is invalid.")
-			return None
+			self.rollback()
+			print(f'Product {_productId} already has tag {_tagId} or one of the IDs is invalid.')
+			raise
+		except Exception as e:
+			print(f'Error in add_tag_to_product: {e}')
+			self.rollback()
+			raise
 
-	def remove_tag_from_product(self, _productId: int, _tagId: int, /) -> int | None:
+	def remove_tag_from_product(self, _productId: Id, _tagId: Id, /) -> int | None:
 		"""
 		Removes a tag association from a product.
 
@@ -746,40 +835,58 @@ class Database:
 			_tagId: The ID of the tag.
 
 		Returns:
-			The number of affected rows (1 if successful, 0 if not found), or None on error.
+			The number of affected rows (1 if successful).
+
+		Raises:
+			ValueError: If the tag is not associated with the product.
 		"""
 		query = 'DELETE FROM `Product-Tag` WHERE productID = %s AND tagID = %s'
-		return self._execute(query, (_productId, _tagId))
+		try:
+			affected_rows = self._execute(query, (_productId, _tagId))
+			if affected_rows == 0:
+				self.rollback() # Nothing was changed, but good practice
+				raise ValueError(f'Tag ID {_tagId} is not associated with Product ID {_productId}.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in remove_tag_from_product: {e}')
+			self.rollback()
+			raise
 
 	# --- Image Management ---
 
-	def add_image_to_product(self, _url: str, _productId: int, /) -> int | None:
+	def add_image_to_product(self, _url: str, _productId: Id, /) -> Id | None:
 		"""
-		Adds an image and associates it with a product.
+		Adds an image and associates it with a product. This is an atomic operation.
 
 		Args:
 			_url: The URL of the image.
 			_productId: The ID of the product to associate the image with.
 
 		Returns:
-			The imageID of the newly added image if successful, otherwise None.
+			The imageID of the newly added image if successful.
 		"""
-		# Create image
-		image_query = 'INSERT INTO Image (url) VALUES (%s)'
-		image_id = self._execute(image_query, (_url,), _returnLastId=True)
+		try:
+			image_query = 'INSERT INTO Image (url) VALUES (%s)'
+			image_id = self._execute(image_query, (_url,), _returnLastId=True)
 
-		if image_id is not None:
-			# Link to product
+			if image_id is None: # Should not happen if _execute works as expected and insert is valid
+				raise Exception('Failed to create image entry, image_id is None.')
+
 			link_query = 'INSERT INTO `Product-Image` (productID, imageID) VALUES (%s, %s)'
 			link_result = self._execute(link_query, (_productId, image_id))
-			if link_result is not None and link_result > 0:
-				return image_id
-			else: # Failed to link, rollback or delete the orphaned image
-				print(f"Failed to link image {image_id} to product {_productId}.")
-				return None
-		return None
 
-	def delete_image(self, _imageId: int, /) -> int | None:
+			if link_result is None or link_result == 0:
+				raise Exception(f'Failed to link image {image_id} to product {_productId}.')
+
+			self.commit()
+			return image_id
+		except Exception as e:
+			print(f'Error in add_image_to_product: {e}')
+			self.rollback()
+			raise
+
+	def delete_image(self, _imageId: Id, /) -> int | None:
 		"""
 		Deletes an image by its ID. Associated entries in Product-Image will be cascade deleted.
 
@@ -787,14 +894,21 @@ class Database:
 			_imageId: The ID of the image to delete.
 
 		Returns:
-			The number of affected rows (1 if successful), or None on error.
+			The number of affected rows (1 if successful).
 		"""
 		query = 'DELETE FROM Image WHERE imageID = %s'
-		return self._execute(query, (_imageId,))
+		try:
+			affected_rows = self._execute(query, (_imageId,))
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in delete_image: {e}')
+			self.rollback()
+			raise
 
 	# --- Trolley & Line Item Management ---
 
-	def get_trolley(self, _accountId: int, /) -> list[DictRow] | None:
+	def get_trolley(self, _accountId: Id, /) -> list[DictRow] | None:
 		"""
 		Retrieves all line items in an account's trolley.
 
@@ -802,8 +916,7 @@ class Database:
 			_accountId: The ID of the account.
 
 		Returns:
-			A list of dictionaries, each representing a line item in the trolley, or None on error.
-			Returns an empty list if the trolley is empty.
+			A list of dictionaries, each representing a line item in the trolley. Empty list if none.
 		"""
 		query = '''
 			SELECT li.lineItemID, li.productID, p.name as productName,
@@ -815,44 +928,45 @@ class Database:
 		'''
 		return self._fetch_all(query, (_accountId,))
 
-	def add_to_trolley(self, _accountId: int, _productId: int, /, *, _quantity: int = 1) -> int | None:
+	def add_to_trolley(self, _accountId: Id, _productId: Id, /, *, _quantity: int = 1) -> Id | None:
 		"""
-		Adds a product to an account's trolley.
-		If the product is already in the trolley, this method currently creates a new line item.
-		Consider adding logic to update quantity if item already exists.
+		Adds a product to an account's trolley. This is an atomic operation.
 
 		Args:
 			_accountId: The ID of the account.
 			_productId: The ID of the product to add.
-			_quantity: The quantity of the product to add (must be >= 1).
+			_quantity: The quantity of the product to add.
 
 		Returns:
-			The lineItemID of the newly created line item if successful, otherwise None.
+			The lineItemID of the newly created line item if successful.
 
 		Raises:
 			ValueError: If _quantity is less than 1.
 		"""
 		if _quantity < 1:
-			raise ValueError("Quantity must be at least 1.")
+			raise ValueError('Quantity must be at least 1.')
+		try:
+			line_item_query = 'INSERT INTO LineItem (productID, quantity) VALUES (%s, %s)'
+			line_item_id = self._execute(line_item_query, (_productId, _quantity), _returnLastId=True)
 
-		# Create line item (priceAtSale is null until order)
-		line_item_query = 'INSERT INTO LineItem (productID, quantity) VALUES (%s, %s)'
-		line_item_id = self._execute(line_item_query, (_productId, _quantity), _returnLastId=True)
+			if line_item_id is None:
+				raise Exception('Failed to create line item, line_item_id is None.')
 
-		if line_item_id is not None:
-			# Add to trolley
 			trolley_query = 'INSERT INTO Trolley (accountID, lineItemID) VALUES (%s, %s)'
 			trolley_add_result = self._execute(trolley_query, (_accountId, line_item_id))
-			if trolley_add_result is not None and trolley_add_result > 0:
-				return line_item_id
-			else: # Failed to add to trolley, cleanup line item
-				print(f"Failed to add line item {line_item_id} to trolley for account {_accountId}. Cleaning up line item.")
-				self._execute('DELETE FROM LineItem WHERE lineItemID = %s', (line_item_id,))
-				return None
-		return None
+
+			if trolley_add_result is None or trolley_add_result == 0:
+				raise Exception(f'Failed to add line item {line_item_id} to trolley for account {_accountId}.')
+
+			self.commit()
+			return line_item_id
+		except Exception as e:
+			print(f'Error in add_to_trolley: {e}')
+			self.rollback()
+			raise
 
 	def change_quantity_of_product_in_trolley(
-		self, _accountId: int, _productId: int, _newQuantity: int, /
+		self, _accountId: Id, _productId: Id, _newQuantity: int, /
 	) -> int | None:
 		"""
 		Changes the quantity of a product in an account's trolley.
@@ -861,206 +975,210 @@ class Database:
 		Args:
 			_accountId: The ID of the account.
 			_productId: The ID of the product whose quantity is to be changed.
-			_newQuantity: The new quantity. If <= 0, the item is removed.
+			_newQuantity: The new quantity.
 
 		Returns:
-			The number of affected LineItem rows (1 if quantity updated, 0 if item not found),
-			or the result of remove_from_trolley if quantity is <=0. None on error.
+			The number of affected LineItem rows (1 if quantity updated).
+			If item removed, returns result of remove_from_trolley.
+
+		Raises:
+			ValueError: If _newQuantity is less than 1.
+						If the product is not found in the account's trolley.
 		"""
-		# Find the lineItemID for the product in the user's trolley
-		find_query = """
-			SELECT t.lineItemID
-			FROM Trolley t
-			JOIN LineItem li ON t.lineItemID = li.lineItemID
-			WHERE t.accountID = %s AND li.productID = %s
-		"""
-		item = self._fetch_one(find_query, (_accountId, _productId))
+		if _newQuantity < 1:
+			raise ValueError('New quantity must be at least 1.')
 
-		if not item:
-			return 0 # Item not in trolley
+		try:
+			find_query = """
+				SELECT t.lineItemID
+				FROM Trolley t
+				JOIN LineItem li ON t.lineItemID = li.lineItemID
+				WHERE t.accountID = %s AND li.productID = %s
+			"""
+			item = self._fetch_one(find_query, (_accountId, _productId))
 
-		line_item_id = item['lineItemID']
+			if not item:
+				raise ValueError(f'Product ID {_productId} not found in trolley for account ID {_accountId}.')
 
-		if _newQuantity <= 0:
-			# Remove item from trolley and delete the line item
-			self._execute('DELETE FROM Trolley WHERE accountID = %s AND lineItemID = %s', (_accountId, line_item_id))
-			return self._execute('DELETE FROM LineItem WHERE lineItemID = %s', (line_item_id,))
-		else:
-			# Update quantity
+			line_item_id: Id = item['lineItemID']
+
 			update_query = 'UPDATE LineItem SET quantity = %s WHERE lineItemID = %s'
-			return self._execute(update_query, (_newQuantity, line_item_id))
+			affected_rows = self._execute(update_query, (_newQuantity, line_item_id))
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in change_quantity_of_product_in_trolley: {e}')
+			self.rollback()
+			raise
 
-	def remove_from_trolley(self, _accountId: int, _lineItemId: int, /) -> tuple[int | None, int | None]:
+	def remove_from_trolley(self, _accountId: Id, _lineItemId: Id, /) -> tuple[int, int] :
 		"""
 		Removes a specific line item from an account's trolley and deletes the line item itself.
+		This is an atomic operation.
 
 		Args:
 			_accountId: The ID of the account.
 			_lineItemId: The ID of the line item to remove.
 
 		Returns:
-			A tuple containing:
-			 (affected rows from Trolley deletion or None on error,
-			  affected rows from LineItem deletion or None on error)
+			A tuple containing: (affected rows from Trolley deletion, affected rows from LineItem deletion).
+			Typically (1, 1) on success.
+
+		Raises:
+			ValueError: If the line item is not found in the specified account's trolley.
 		"""
-		# Ensure the line item belongs to the account's trolley before deleting
-		trolley_check_query = 'SELECT 1 FROM Trolley WHERE accountID = %s AND lineItemID = %s'
-		if not self._fetch_one(trolley_check_query, (_accountId, _lineItemId)):
-			print(f"LineItem {_lineItemId} not found in trolley for account {_accountId}.")
-			return (0, 0)
+		try:
+			trolley_check_query = 'SELECT 1 FROM Trolley WHERE accountID = %s AND lineItemID = %s'
+			if not self._fetch_one(trolley_check_query, (_accountId, _lineItemId)):
+				raise ValueError(f'LineItem ID {_lineItemId} not found in trolley for account ID {_accountId}.')
 
-		trolley_delete_res = self._execute('DELETE FROM Trolley WHERE accountID = %s AND lineItemID = %s', (_accountId, _lineItemId))
-		line_item_delete_res = self._execute('DELETE FROM LineItem WHERE lineItemID = %s', (_lineItemId,))
-		return (trolley_delete_res, line_item_delete_res)
+			trolley_delete_res = self._execute('DELETE FROM Trolley WHERE accountID = %s AND lineItemID = %s', (_accountId, _lineItemId))
+			if trolley_delete_res is None or trolley_delete_res == 0: # Should be 1 if check passed
+				raise Exception(f'Failed to delete LineItem ID {_lineItemId} from Trolley for account ID {_accountId}.')
 
-	def clear_trolley(self, _accountId: int, /) -> int | None:
+
+			line_item_delete_res = self._execute('DELETE FROM LineItem WHERE lineItemID = %s', (_lineItemId,))
+			if line_item_delete_res is None or line_item_delete_res == 0: # Should be 1
+				raise Exception(f'Failed to delete LineItem ID {_lineItemId} from LineItem table.')
+
+			self.commit()
+			return (trolley_delete_res, line_item_delete_res)
+		except Exception as e:
+			print(f'Error in remove_from_trolley: {e}')
+			self.rollback()
+			raise
+
+	def clear_trolley(self, _accountId: Id, /) -> int | None:
 		"""
 		Clears all items from an account's trolley.
 		This involves deleting entries from the Trolley table and also deleting the associated LineItems
-		that are not part of any existing order.
+		that are not part of any existing order. This is an atomic operation.
 
 		Args:
 			_accountId: The ID of the account whose trolley is to be cleared.
 
 		Returns:
-			The number of LineItems successfully deleted, or None if an error occurs.
+			The number of LineItems successfully deleted from the LineItem table.
 		"""
-		# Get all lineItemIDs in the user's trolley
-		trolley_items_query = 'SELECT lineItemID FROM Trolley WHERE accountID = %s'
-		trolley_items = self._fetch_all(trolley_items_query, (_accountId,))
+		try:
+			trolley_items_query = 'SELECT lineItemID FROM Trolley WHERE accountID = %s'
+			trolley_items_result = self._fetch_all(trolley_items_query, (_accountId,))
 
-		if trolley_items is None: # Error fetching
-			return None
-		if not trolley_items: # Trolley is empty
-			return 0
+			if trolley_items_result is None: # Error fetching
+				raise Exception(f'Failed to fetch trolley items for account {_accountId}.')
+			if not trolley_items_result: # Trolley is empty
+				return 0
 
-		line_item_ids_in_trolley = [item['lineItemID'] for item in trolley_items]
-		placeholders = ', '.join(['%s'] * len(line_item_ids_in_trolley))
+			line_item_ids_in_trolley = [item['lineItemID'] for item in trolley_items_result]
+			placeholders = ', '.join(['%s'] * len(line_item_ids_in_trolley))
 
-		# First, delete items from the Trolley table
-		delete_trolley_query = f'DELETE FROM Trolley WHERE accountID = %s AND lineItemID IN ({placeholders})'
-		# We pass _accountId first, then unpack the list of line_item_ids
-		params_trolley = (_accountId,) + tuple(line_item_ids_in_trolley)
-		trolley_deleted_count = self._execute(delete_trolley_query, params_trolley)
+			delete_trolley_query = f'DELETE FROM Trolley WHERE accountID = %s AND lineItemID IN ({placeholders})'
+			params_trolley = (_accountId,) + tuple(line_item_ids_in_trolley)
+			trolley_deleted_count = self._execute(delete_trolley_query, params_trolley)
 
-		if trolley_deleted_count is None: # Error during trolley deletion
-			print(f"Error clearing trolley entries for account {_accountId}.")
-			# Rollback would have happened in _execute.
-			return None
+			if trolley_deleted_count is None:
+				raise Exception(f'Error clearing trolley entries for account {_accountId}.')
 
-		# Now, delete LineItems that were in the trolley and are not in any OrderItem
-		# This is a bit safer: only delete line items that are not referenced by OrderItem
-		delete_line_items_query = f'''
-			DELETE FROM LineItem
-			WHERE lineItemID IN ({placeholders})
-			AND lineItemID NOT IN (SELECT DISTINCT lineItemID FROM OrderItem)
-		'''
-		line_items_deleted_count = self._execute(delete_line_items_query, tuple(line_item_ids_in_trolley))
+			delete_line_items_query = f'''
+				DELETE FROM LineItem
+				WHERE lineItemID IN ({placeholders})
+				AND lineItemID NOT IN (SELECT DISTINCT lineItemID FROM OrderItem)
+			'''
+			line_items_deleted_count = self._execute(delete_line_items_query, tuple(line_item_ids_in_trolley))
 
-		if line_items_deleted_count is None:
-			print(f"Error deleting orphaned line items for account {_accountId} after trolley clear.")
-			# Potentially partial success, but _execute handles rollback on its own error.
-			return None
+			if line_items_deleted_count is None:
+				raise Exception(f'Error deleting orphaned line items for account {_accountId} after trolley clear.')
 
-		return line_items_deleted_count
+			self.commit()
+			return line_items_deleted_count
+		except Exception as e:
+			print(f'Error in clear_trolley: {e}')
+			self.rollback()
+			raise
 
 	# --- Order Management ---
 
-	def create_order(self, _accountId: int, _addressId: int, /) -> int | None:
+	def create_order(self, _accountId: Id, _addressId: Id, /) -> Id | None:
 		"""
 		Creates an order for an account using all items currently in their trolley.
 		Sets `priceAtSale` for each line item and moves items from trolley to order.
+		This is an atomic operation.
 
 		Args:
 			_accountId: The ID of the account placing the order.
 			_addressId: The ID of the address for the order.
 
 		Returns:
-			The orderID of the newly created order, or None if creation failed (e.g., empty trolley).
+			The orderID of the newly created order.
 
 		Raises:
-			ValueError: If the specified address does not belong to the account.
+			ValueError: If the specified address does not belong to the account,
+						or if the trolley is empty.
+			Exception: If any database operation fails during order creation.
 		"""
-		# Verify address belongs to account
-		address_check_query = "SELECT 1 FROM Address WHERE addressID = %s AND accountID = %s"
-		if not self._fetch_one(address_check_query, (_addressId, _accountId)):
-			raise ValueError(f"Address ID {_addressId} does not belong to account ID {_accountId}.")
+		try:
+			address_check_query = 'SELECT 1 FROM Address WHERE addressID = %s AND accountID = %s'
+			if not self._fetch_one(address_check_query, (_addressId, _accountId)):
+				raise ValueError(f'Address ID {_addressId} does not belong to account ID {_accountId}.')
 
-		trolley_line_items = self.get_trolley(_accountId)
-		if trolley_line_items is None: # Error fetching trolley
-			print(f"Error fetching trolley for account {_accountId} during order creation.")
-			return None
-		if not trolley_line_items:
-			print(f"Trolley is empty for account {_accountId}. Cannot create order.")
-			return None # Or raise an exception
+			trolley_line_items = self.get_trolley(_accountId) # This is a read, doesn't need explicit transaction part here
+			if trolley_line_items is None:
+				raise Exception(f'Error fetching trolley for account {_accountId} during order creation.')
+			if not trolley_line_items:
+				raise ValueError(f'Trolley is empty for account {_accountId}. Cannot create order.')
 
-		# Update priceAtSale for each line item in the trolley
-		for item in trolley_line_items:
-			line_item_id = item['lineItemID']
-			product_id = item['productID']
-			# Fetch current product price (could also use item['currentPrice'] from get_trolley)
-			product_info = self.get_product(product_id)
-			if not product_info or product_info['price'] is None:
-				print(f"Could not fetch price for product {product_id}. Aborting order.")
-				self.rollback() # Rollback any previous price updates in this loop
-				return None
-			current_price = product_info['price']
+			# Start of transactional operations
+			for item in trolley_line_items:
+				line_item_id: Id = item['lineItemID']
+				product_id: Id = item['productID']
+				product_info = self.get_product(product_id) # Read operation
 
-			update_price_query = 'UPDATE LineItem SET priceAtSale = %s WHERE lineItemID = %s'
-			update_res = self._execute(update_price_query, (current_price, line_item_id))
-			if update_res is None or update_res == 0:
-				print(f"Failed to update priceAtSale for lineItem {line_item_id}. Aborting order.")
-				self.rollback()
-				return None
+				if not product_info or product_info['price'] is None:
+					raise Exception(f'Could not fetch price for product {product_id}. Aborting order.')
+				current_price = product_info['price']
 
-		# Create order
-		order_query = '''
-			INSERT INTO `Order` (accountID, addressID, date)
-			VALUES (%s, %s, %s)
-		'''
-		order_id = self._execute(order_query, (_accountId, _addressId, datetime.now()), _returnLastId=True)
+				update_price_query = 'UPDATE LineItem SET priceAtSale = %s WHERE lineItemID = %s'
+				update_res = self._execute(update_price_query, (current_price, line_item_id))
+				if update_res is None or update_res == 0:
+					raise Exception(f'Failed to update priceAtSale for lineItem {line_item_id}.')
 
-		if order_id is None:
-			print("Failed to create order entry.")
-			self.rollback() # Rollback price updates
-			return None
+			order_query = '''
+				INSERT INTO `Order` (accountID, addressID, date)
+				VALUES (%s, %s, %s)
+			'''
+			order_id = self._execute(order_query, (_accountId, _addressId, datetime.now()), _returnLastId=True)
 
-		# Link line items to order and remove from trolley
-		line_item_ids_in_order: list[int] = []
-		for item in trolley_line_items:
-			line_item_id = item['lineItemID']
-			link_query = 'INSERT INTO OrderItem (orderID, lineItemID) VALUES (%s, %s)'
-			link_res = self._execute(link_query, (order_id, line_item_id))
-			if link_res is None or link_res == 0:
-				print(f"Failed to link lineItem {line_item_id} to order {order_id}. Rolling back order.")
-				# Complex rollback: delete OrderItems, delete Order, revert priceAtSale.
-				# For simplicity, full transaction rollback is better handled by `get_db` context manager.
-				# Here, we'll just signal failure. The commit in _execute might be an issue for multi-step operations.
-				# A better pattern is to commit only at the very end of the entire operation.
-				# For now, rely on _execute's rollback for its own operation.
-				self.rollback() # Attempt to rollback the entire transaction if possible
-				return None
-			line_item_ids_in_order.append(line_item_id)
+			if order_id is None:
+				raise Exception('Failed to create order entry.')
 
-		# Clear these specific items from the trolley
-		if line_item_ids_in_order:
-			placeholders = ', '.join(['%s'] * len(line_item_ids_in_order))
-			clear_trolley_query = f'DELETE FROM Trolley WHERE accountID = %s AND lineItemID IN ({placeholders})'
-			params_clear = (_accountId,) + tuple(line_item_ids_in_order)
-			clear_res = self._execute(clear_trolley_query, params_clear)
-			if clear_res is None:
-				print(f"Warning: Order {order_id} created, but failed to clear items from trolley.")
-				# Order is still created, but trolley might be inconsistent.
-				# This highlights the need for a single commit at the end of the whole method.
-				# For now, we proceed with the order_id.
+			line_item_ids_in_order: list[Id] = []
+			for item in trolley_line_items:
+				line_item_id: Id = item['lineItemID']
+				link_query = 'INSERT INTO OrderItem (orderID, lineItemID) VALUES (%s, %s)'
+				link_res = self._execute(link_query, (order_id, line_item_id))
+				if link_res is None or link_res == 0:
+					raise Exception(f'Failed to link lineItem {line_item_id} to order {order_id}.')
+				line_item_ids_in_order.append(line_item_id)
 
-		# self.commit() # Ideally, commit would happen here for the whole operation.
-		# Current _execute commits after each successful statement.
-		return order_id
+			if line_item_ids_in_order:
+				placeholders = ', '.join(['%s'] * len(line_item_ids_in_order))
+				clear_trolley_query = f'DELETE FROM Trolley WHERE accountID = %s AND lineItemID IN ({placeholders})'
+				params_clear = (_accountId,) + tuple(line_item_ids_in_order)
+				clear_res = self._execute(clear_trolley_query, params_clear)
+				if clear_res is None or clear_res != len(line_item_ids_in_order):
+					# Check if the number of cleared items matches expected
+					raise Exception(f'Failed to clear all ordered items from trolley for account {_accountId}. Expected {len(line_item_ids_in_order)}, got {clear_res}.')
+
+			self.commit()
+			return order_id
+		except Exception as e:
+			print(f'Error in create_order: {e}')
+			self.rollback()
+			raise
 
 	# --- Invoice Management ---
 
-	def save_invoice(self, _accountId: int, _orderId: int, _data: bytes, /) -> int | None:
+	def save_invoice(self, _accountId: Id, _orderId: Id, _data: bytes, /) -> Id | None:
 		"""
 		Saves invoice data for an order.
 
@@ -1070,15 +1188,22 @@ class Database:
 			_data: The invoice data (e.g., PDF bytes).
 
 		Returns:
-			The invoiceID of the saved invoice, or None if saving failed.
+			The invoiceID of the saved invoice.
 		"""
 		query = '''
 			INSERT INTO Invoice (accountID, orderID, creationDate, data)
 			VALUES (%s, %s, %s, %s)
 		'''
-		return self._execute(query, (_accountId, _orderId, datetime.now(), _data), _returnLastId=True)
+		try:
+			invoice_id = self._execute(query, (_accountId, _orderId, datetime.now(), _data), _returnLastId=True)
+			self.commit()
+			return invoice_id
+		except Exception as e:
+			print(f'Error in save_invoice: {e}')
+			self.rollback()
+			raise
 
-	def get_invoice(self, _invoiceId: int, /) -> DictRow | None:
+	def get_invoice(self, _invoiceId: Id, /) -> DictRow | None:
 		"""
 		Retrieves invoice data by its ID.
 
@@ -1097,7 +1222,7 @@ class Database:
 
 	# --- Receipt Management ---
 
-	def save_receipt(self, _accountId: int, _orderId: int, _data: bytes, /) -> int | None:
+	def save_receipt(self, _accountId: Id, _orderId: Id, _data: bytes, /) -> Id | None:
 		"""
 		Saves receipt data for an order.
 
@@ -1107,15 +1232,22 @@ class Database:
 			_data: The receipt data (e.g., PDF bytes).
 
 		Returns:
-			The receiptID of the saved receipt, or None if saving failed.
+			The receiptID of the saved receipt.
 		"""
 		query = '''
 			INSERT INTO Receipt (accountID, orderID, creationDate, data)
 			VALUES (%s, %s, %s, %s)
 		'''
-		return self._execute(query, (_accountId, _orderId, datetime.now(), _data), _returnLastId=True)
+		try:
+			receipt_id = self._execute(query, (_accountId, _orderId, datetime.now(), _data), _returnLastId=True)
+			self.commit()
+			return receipt_id
+		except Exception as e:
+			print(f'Error in save_receipt: {e}')
+			self.rollback()
+			raise
 
-	def get_receipt(self, _receiptId: int, /) -> DictRow | None:
+	def get_receipt(self, _receiptId: Id, /) -> DictRow | None:
 		"""
 		Retrieves receipt data by its ID.
 
@@ -1134,7 +1266,7 @@ class Database:
 
 	# --- Report Management ---
 
-	def save_report(self, _creatorId: int, _data: bytes, /) -> int | None:
+	def save_report(self, _creatorId: Id, _data: bytes, /) -> Id | None:
 		"""
 		Saves report data.
 
@@ -1143,15 +1275,22 @@ class Database:
 			_data: The report data (e.g., PDF or CSV bytes).
 
 		Returns:
-			The reportID of the saved report, or None if saving failed.
+			The reportID of the saved report.
 		"""
 		query = '''
 			INSERT INTO Report (creator, creationDate, data)
 			VALUES (%s, %s, %s)
 		'''
-		return self._execute(query, (_creatorId, datetime.now(), _data), _returnLastId=True)
+		try:
+			report_id = self._execute(query, (_creatorId, datetime.now(), _data), _returnLastId=True)
+			self.commit()
+			return report_id
+		except Exception as e:
+			print(f'Error in save_report: {e}')
+			self.rollback()
+			raise
 
-	def get_report(self, _reportId: int, /) -> DictRow | None:
+	def get_report(self, _reportId: Id, /) -> DictRow | None:
 		"""
 		Retrieves report data by its ID.
 
@@ -1180,9 +1319,6 @@ class Database:
 
 		Returns:
 			A list of string enum values, or None if the column is not found or not an ENUM.
-
-		Raises:
-			ValueError: If the column is not found or not an ENUM type (though currently returns None).
 		"""
 		query = '''
 			SELECT COLUMN_TYPE
@@ -1193,17 +1329,16 @@ class Database:
 		'''
 		result = self._fetch_one(query, (tableName, columnName))
 		if not result:
-			print(f"Column '{columnName}' in table '{tableName}' not found.")
-			return None # Changed from raise ValueError to return None for consistency
+			print(f'Column \'{columnName}\' in table \'{tableName}\' not found.')
+			return None
 
-		column_type: str = result["COLUMN_TYPE"]
-		if not column_type.lower().startswith("enum("):
-			print(f"Column '{columnName}' in table '{tableName}' is not an ENUM type. Type: {column_type}")
-			return None # Changed from raise ValueError
+		column_type: str = result['COLUMN_TYPE']
+		if not column_type.lower().startswith('enum('):
+			print(f'Column \'{columnName}\' in table \'{tableName}\' is not an ENUM type. Type: {column_type}')
+			return None
 
-		# e.g., "enum('val1','val2','val3')"
 		enum_str = column_type[column_type.find('(')+1 : column_type.rfind(')')]
-		enum_values = [val.strip("'") for val in enum_str.split(",")]
+		enum_values = [val.strip("'") for val in enum_str.split(',')]
 		return enum_values
 
 
@@ -1219,225 +1354,143 @@ def get_db() -> Generator[Database, None, None]:
 		raw_conn = Database.get_connection()
 		db_instance = Database(raw_conn)
 		yield db_instance
-		# If no exceptions, commit is handled by individual _execute calls for now.
-		# For more complex transactions spanning multiple db_instance calls,
-		# you might want to avoid auto-commit in _execute and commit here.
-		# db_instance.commit() # Example if _execute didn't commit
-	except mariadb.Error as e:
-		print(f"MariaDB error within get_db context: {e}")
-		if db_instance: # Rollback if instance was created
+		# If yield was successful and no exceptions, assume commit was handled by methods or not needed.
+		# If an unhandled exception occurs after yield and before finally,
+		# the rollback in the finally block of this function will handle it.
+	except Exception as e: # Catch all exceptions from the route handler or db methods
+		if db_instance:
 			try:
 				db_instance.rollback()
-				print("Transaction rolled back due to MariaDB error in get_db.")
+				print(f'Transaction rolled back due to exception in get_db context: {e}')
 			except Exception as rb_e:
-				print(f"Error during rollback attempt in get_db: {rb_e}")
+				print(f'Error during rollback attempt in get_db: {rb_e}')
+		if isinstance(e, HTTPException): # Re-raise HTTPExceptions
+			raise
+		# Wrap other exceptions in HTTPException for consistent error response
 		raise HTTPException(
 			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-			detail=f"A database error occurred: {e}"
-		)
-	except HTTPException: # Re-raise HTTPExceptions
-		if db_instance: # Attempt rollback for HTTP exceptions that might imply failed operations
-			try:
-				db_instance.rollback()
-				print("Transaction rolled back due to HTTPException in get_db.")
-			except Exception as rb_e:
-				print(f"Error during rollback attempt in get_db (HTTPException path): {rb_e}")
-		raise
-	except Exception as e:
-		print(f"Unexpected error in get_db context: {e}")
-		if db_instance: # Rollback for any other unexpected error
-			try:
-				db_instance.rollback()
-				print("Transaction rolled back due to unexpected error in get_db.")
-			except Exception as rb_e:
-				print(f"Error during rollback attempt in get_db (unexpected error path): {rb_e}")
-		raise HTTPException(
-			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-			detail=f"An unexpected error occurred: {e}"
+			detail=f'An error occurred: {e}'
 		)
 	finally:
 		if db_instance:
 			db_instance.close()
 
 # Example usage (optional, for testing)
-if __name__ == "__main__":
-	print("Running Database class example...")
-	# Ensure you have a MariaDB/MySQL server running and configured in MockSettings
-	# or replace MockSettings with your actual settings.
-	# Also, the database schema needs to be applied.
+if __name__ == '__main__':
+	print('Running Database class example...')
 
 	try:
-		# Initialize pool (usually done at application startup)
-		# Database.initialize_pool() # Called by get_connection if not initialized
-
-		# Using the context manager
 		db_gen = get_db()
 		db = next(db_gen)
 
 		try:
-			print("Successfully obtained database connection.")
+			print('Successfully obtained database connection.')
 
-			# Example: Get enum values for Account status
-			print("\n--- Testing get_enum_values ---")
+			print('\n--- Testing get_enum_values ---')
 			account_statuses = db.get_enum_values('Account', 'status')
-			if account_statuses:
-				print(f"Account statuses: {account_statuses}")
-			else:
-				print("Could not get account statuses.")
-
+			print(f'Account statuses: {account_statuses}')
 			account_roles = db.get_enum_values('Account', 'role')
-			if account_roles:
-				print(f"Account roles: {account_roles}")
-			else:
-				print("Could not get account roles.")
+			print(f'Account roles: {account_roles}')
 
-			# Example: Create an account
-			print("\n--- Testing create_account ---")
+			print('\n--- Testing create_account ---')
+			test_email = f'testuser_{datetime.now().timestamp()}@example.com'
 			new_account_id = db.create_account(
-				f'testuser_{datetime.now().timestamp()}@example.com',
-				"hashed_password",
+				test_email,
+				'hashed_password',
 				Role.CUSTOMER,
-				_firstName="Test",
-				_lastName="User",
+				_firstName='Test',
+				_lastName='User',
 			)
+			print(f'Created account ID: {new_account_id}')
+
 			if new_account_id:
-				print(f"Created account with ID: {new_account_id}")
-
-				# Example: Get the created account
-				print("\n--- Testing get_account ---")
+				print('\n--- Testing get_account ---')
 				account = db.get_account(_accountId=new_account_id)
-				if account:
-					print(f"Retrieved account: {account}")
-				else:
-					print(f"Could not retrieve account ID {new_account_id}")
+				print(f'Retrieved account: {account}')
 
-				# Example: Update account
-				print("\n--- Testing update_account ---")
-				updated_rows = db.update_account(new_account_id, _firstName="UpdatedTest", status=Status.ACTIVE)
-				if updated_rows is not None:
-					print(f"Updated account, rows affected: {updated_rows}")
-					account_after_update = db.get_account(_accountId=new_account_id)
-					print(f"Account after update: {account_after_update}")
-				else:
-					print("Failed to update account.")
+				print('\n--- Testing update_account ---')
+				updated_rows = db.update_account(new_account_id, _firstName='UpdatedTest', status=Status.ACTIVE.value)
+				print(f'Updated account, rows affected: {updated_rows}')
+				account_after_update = db.get_account(_accountId=new_account_id)
+				print(f'Account after update: {account_after_update}')
 
-				# Example: Create address
-				print("\n--- Testing create_address ---")
-				address_id = db.create_address(new_account_id, "123 Main St, Anytown")
-				if address_id:
-					print(f"Created address with ID: {address_id}")
-					addresses = db.get_addresses(new_account_id)
-					print(f"Addresses for account {new_account_id}: {addresses}")
 
-					# Example: Modify address
-					print("\n--- Testing modify_address ---")
-					mod_addr_rows = db.modify_address(address_id, "456 New Ave, Anytown")
-					if mod_addr_rows is not None:
-						print(f"Modified address, rows affected: {mod_addr_rows}")
-						addresses_after_mod = db.get_addresses(new_account_id)
-						print(f"Addresses after modification: {addresses_after_mod}")
+				print('\n--- Testing Product and Tag Management ---')
+				tag1_id = db.create_tag('ElectronicsTest')
+				tag2_id = db.create_tag('GadgetTest')
+				print(f'Created tags: {tag1_id}, {tag2_id}')
 
-				# Example: Add product
-				print("\n--- Testing add_product ---")
-				product_id_1 = db.add_product("Laptop Pro", "High-end laptop", 1200.99, 50, 45)
-				product_id_2 = db.add_product("Wireless Mouse", "Ergonomic mouse", 25.50, 200, 190)
-				if product_id_1: print(f"Added product 1 ID: {product_id_1}")
-				if product_id_2: print(f"Added product 2 ID: {product_id_2}")
+				product_id_1 = db.add_product('Test Laptop', 'A test laptop.', 999.99, 10, 5)
+				print(f'Added product 1 ID: {product_id_1}')
 
-				if product_id_1:
-					# Example: Get product
-					print("\n--- Testing get_product ---")
-					product = db.get_product(product_id_1)
-					print(f"Retrieved product: {product}")
+				if product_id_1 and tag1_id and tag2_id:
+					db.add_tag_to_product(product_id_1, tag1_id)
+					db.add_tag_to_product(product_id_1, tag2_id)
+					print(f'Added tags to product {product_id_1}')
 
-					# Example: Add to trolley
-					print("\n--- Testing add_to_trolley ---")
+					products_with_tags = db.get_products_with_tagIDs({tag1_id, tag2_id})
+					print(f'Products with tags {tag1_id} & {tag2_id}: {products_with_tags}')
+
+					try:
+						db.remove_tag_from_product(product_id_1, tag1_id)
+						print(f'Removed tag {tag1_id} from product {product_id_1}')
+						# Try removing a non-existent tag association
+						db.remove_tag_from_product(product_id_1, 99999) # Should raise ValueError
+					except ValueError as ve:
+						print(f'Caught expected error: {ve}')
+
+
+				print('\n--- Testing Trolley and Order ---')
+				address_id = db.create_address(new_account_id, '123 Test St, Testville')
+				print(f'Created address ID: {address_id}')
+
+				if product_id_1 and address_id:
 					line_item_id = db.add_to_trolley(new_account_id, product_id_1, _quantity=2)
-					if line_item_id:
-						print(f"Added product {product_id_1} to trolley, line item ID: {line_item_id}")
-						trolley_items = db.get_trolley(new_account_id)
-						print(f"Trolley contents: {trolley_items}")
+					print(f'Added product {product_id_1} to trolley, line item ID: {line_item_id}')
 
-						# Example: Change quantity in trolley
-						print("\n--- Testing change_quantity_of_product_in_trolley ---")
-						changed_qty_res = db.change_quantity_of_product_in_trolley(new_account_id, product_id_1, 3)
-						print(f"Changed quantity result: {changed_qty_res}")
-						trolley_items_after_qty_change = db.get_trolley(new_account_id)
-						print(f"Trolley after quantity change: {trolley_items_after_qty_change}")
+					db.change_quantity_of_product_in_trolley(new_account_id, product_id_1, 3)
+					print('Changed quantity in trolley.')
+					trolley_items = db.get_trolley(new_account_id)
+					print(f'Trolley contents: {trolley_items}')
 
+					order_id = db.create_order(new_account_id, address_id)
+					print(f'Created order with ID: {order_id}')
+					trolley_after_order = db.get_trolley(new_account_id)
+					print(f'Trolley contents after order: {trolley_after_order}') # Should be empty
 
-						if product_id_2 and address_id:
-							db.add_to_trolley(new_account_id, product_id_2, _quantity=1)
-							print(f"Trolley before order: {db.get_trolley(new_account_id)}")
-							# Example: Create order
-							print("\n--- Testing create_order ---")
-							order_id = db.create_order(new_account_id, address_id)
-							if order_id:
-								print(f"Created order with ID: {order_id}")
-								trolley_after_order = db.get_trolley(new_account_id)
-								print(f"Trolley contents after order: {trolley_after_order}") # Should be empty or items not ordered
-
-								# Example: Save and get invoice
-								print("\n--- Testing save_invoice & get_invoice ---")
-								invoice_data = b"This is a test invoice PDF content."
-								invoice_id = db.save_invoice(new_account_id, order_id, invoice_data)
-								if invoice_id:
-									print(f"Saved invoice with ID: {invoice_id}")
-									retrieved_invoice = db.get_invoice(invoice_id)
-									if retrieved_invoice:
-										print(f"Retrieved invoice data length: {len(retrieved_invoice.get('data', b''))}")
-									else: print("Failed to retrieve invoice.")
-								else: print("Failed to save invoice.")
-							else:
-								print("Failed to create order.")
-						else:
-							print("Skipping order creation due to missing product or address.")
-					else:
-						print("Failed to add to trolley.")
-
-					# Example: Clear trolley (if anything is left or for testing)
-					# print("\n--- Testing clear_trolley ---")
-					# if product_id_2: # Add another item to test clear
-					#    db.add_to_trolley(new_account_id, product_id_2, _quantity=5)
-					# print(f"Trolley before clear: {db.get_trolley(new_account_id)}")
-					# cleared_items_count = db.clear_trolley(new_account_id)
-					# print(f"Cleared trolley, items deleted: {cleared_items_count}")
-					# print(f"Trolley after clear: {db.get_trolley(new_account_id)}")
+					if order_id:
+						invoice_id = db.save_invoice(new_account_id, order_id, b'Test invoice data')
+						print(f'Saved invoice ID: {invoice_id}')
+						retrieved_invoice = db.get_invoice(invoice_id) # type: ignore
+						print(f'Retrieved invoice data length: {len(retrieved_invoice.get("data", b"")) if retrieved_invoice else "Not found"}')
 
 
-				# Example: Delete account (will cascade delete addresses)
-				# print("\n--- Testing delete_accounts ---")
-				# deleted_count = db.delete_accounts([new_account_id])
-				# if deleted_count is not None:
-				# 	print(f"Deleted accounts: {deleted_count}")
-				# 	account_after_delete = db.get_account(_accountId=new_account_id)
-				# 	print(f"Account after delete: {account_after_delete}") # Should be None
-				# else:
-				# 	print("Failed to delete account.")
+				# Cleanup (optional, as schema drops tables on rerun)
+				# if new_account_id:
+				#     db.delete_accounts({new_account_id})
+				#     print(f'Deleted account {new_account_id}')
+				# if product_id_1:
+				#     # db.delete_product(product_id_1) # Assuming a delete_product method
+				#     pass
+				# if tag1_id: db.delete_tag(tag1_id)
+				# if tag2_id: db.delete_tag(tag2_id)
 
-			else:
-				print("Failed to create account.")
 
 		except Exception as e:
-			print(f"An error occurred during database operations: {e}")
+			print(f'An error occurred during database operations: {e}')
 			import traceback
 			traceback.print_exc()
+		finally:
 			try:
 				next(db_gen, None) # Trigger finally block in get_db for cleanup
 			except StopIteration:
-				pass # Expected if already cleaned up
-		finally:
-			# Ensure the generator's finally block is called for cleanup
-			try:
-				next(db_gen, None)
-			except StopIteration:
-				pass # Expected
+				pass
 
 	except HTTPException as e:
-		print(f"HTTPException (likely during pool init or connection): {e.detail}")
+		print(f'HTTPException (likely during pool init or connection): {e.detail}')
 	except Exception as e:
-		print(f"A critical error occurred: {e}")
+		print(f'A critical error occurred: {e}')
 		import traceback
 		traceback.print_exc()
 
-	print("\nExample run finished.")
+	print('\nExample run finished.')
