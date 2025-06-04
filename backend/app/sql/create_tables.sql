@@ -24,18 +24,18 @@ DROP TABLE IF EXISTS `Role`;
 
 CREATE TABLE `Tag` (
 	`tagID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	`name` VARCHAR(32) NOT NULL
+	`name` VARCHAR(50) NOT NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE `Image` (
 	`imageID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	`url` VARCHAR(32) NOT NULL
+	`url` VARCHAR(255) NOT NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE `Product` (
 	`productID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`name` VARCHAR(100) NOT NULL,
-	`description` VARCHAR(200) NOT NULL,
+	`description` TEXT NOT NULL,
 	`price` FLOAT NOT NULL,
 	`stock` INT NOT NULL COMMENT 'This is the quantity of this product currently held.',
 	`available` INT NOT NULL COMMENT 'This is the quantity of this product available for purchase.',
@@ -48,8 +48,8 @@ CREATE TABLE `Product` (
 
 CREATE TABLE `Account` (
 	`accountID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	`email` VARCHAR(100) NOT NULL,
-	`password` VARCHAR(100) NOT NULL,
+	`email` VARCHAR(255) NOT NULL,
+	`password` VARCHAR(255) NOT NULL,
 	`firstname` VARCHAR(50) DEFAULT NULL,
 	`lastname` VARCHAR(50) DEFAULT NULL,
 	`creationDate` DATETIME NOT NULL,
@@ -61,7 +61,7 @@ CREATE TABLE `Account` (
 CREATE TABLE `Address` (
 	`addressID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
 	`accountID` INT NOT NULL,
-	`location` VARCHAR(150) NOT NULL,
+	`location` VARCHAR(255) NOT NULL,
 	CONSTRAINT `address_FK_account` FOREIGN KEY (`accountID`) REFERENCES `Account` (`accountID`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
