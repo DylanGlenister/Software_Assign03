@@ -47,7 +47,7 @@ def database_health(db: Database = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database query execution failed after successful connection: {str(e)}"
         )
-    
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -93,7 +93,7 @@ def token_info(token: str = Depends(get_token)):
 ### TEMP ROUTE UNTILL IMPEMENTED
 @utility_route.get("/getProducts")
 def get_products(db: Database = Depends(get_db)):
-    products = db.get_products_with_tags()
+    products = db.get_products()
     return {"products": products}
 
 @utility_route.get("/secureExample", dependencies=[Depends(bearer_scheme)], summary="Example secured route")
@@ -110,4 +110,3 @@ def hash_password(data: PasswordRequest):
 
     hashed = Account._hash_password(data.password)
     return {"hashed_password": hashed}
-    
