@@ -8,20 +8,16 @@ class Catalogue:
     Simple catalogue class for displaying, searching, filtering and sorting products.
     """
     
-    def __init__(self, database_connection=None):
+    def __init__(self, db: Database):
         """Initialize catalogue with database connection."""
-        self.db = database_connection
+        self.db = db
         self._products = []
     
     def get_all_products(self) -> List[Product]:
         """
-        Get all products from database.
+        Get all products from database using Product class methods.
         """
-        if self.db:
-            query = "SELECT * FROM products"
-            results = self.db.execute_query(query)
-            self._products = [Product.from_dict(row) for row in results]
-        return self._products
+        return Product.get_all_products(self.db)
     
     def search_products(self, search_term: str) -> List[Product]:
         """
