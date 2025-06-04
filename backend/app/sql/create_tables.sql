@@ -121,7 +121,7 @@ CREATE TABLE `Product-Tag` (
 	`tagID` INT NOT NULL,
 	PRIMARY KEY (`productID`, `tagID`),
 	CONSTRAINT `product-tag_FK_product` FOREIGN KEY (`productID`) REFERENCES `Product` (`productID`),
-	CONSTRAINT `product-tag_FK_tag` FOREIGN KEY (`tagID`) REFERENCES `Tag` (`tagID`)
+	CONSTRAINT `product-tag_FK_tag` FOREIGN KEY (`tagID`) REFERENCES `Tag` (`tagID`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE `Product-Image` (
@@ -129,7 +129,7 @@ CREATE TABLE `Product-Image` (
 	`imageID` INT NOT NULL,
 	PRIMARY KEY (`productID`, `imageID`),
 	CONSTRAINT `product-image_FK_product` FOREIGN KEY (`productID`) REFERENCES `Product` (`productID`),
-	CONSTRAINT `product-image_FK_image` FOREIGN KEY (`imageID`) REFERENCES `Image` (`imageID`)
+	CONSTRAINT `product-image_FK_image` FOREIGN KEY (`imageID`) REFERENCES `Image` (`imageID`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 # A trolley entry will be automatically deleted when an associated account is deleted.
