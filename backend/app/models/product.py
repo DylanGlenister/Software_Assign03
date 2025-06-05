@@ -74,18 +74,6 @@ class Product:
         
         return cls(product_id, db)
     
-    @classmethod
-    def get_all_products(cls, db: Database) -> List["Product"]:
-        """get all existin products from database"""
-        product_ids = db.get_all_product_ids()
-        return [cls(product_id, db) for product_id in product_ids]
-    
-    @classmethod
-    def search_products(cls, db: Database, **search_criteria) -> List["Product"]:
-        """search products"""
-        #passes search parameters we provide directly to the database layer 
-        product_ids = db.search_products(**search_criteria)
-        return [cls(product_id, db) for product_id in product_ids]
 
     def refresh_from_db(self):
         """refresh product datato get latest updates"""

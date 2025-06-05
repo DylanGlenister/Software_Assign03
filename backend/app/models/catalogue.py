@@ -14,10 +14,9 @@ class Catalogue:
         self._products = []
     
     def get_all_products(self) -> List[Product]:
-        """
-        Get all products from database using Product class methods.
-        """
-        return Product.get_all_products(self.db)
+        """Get all products from database."""
+        product_ids = self.db.get_all_product_ids()
+        return [Product(product_id, self.db) for product_id in product_ids]
     
     def search_products(self, search_term: str) -> List[Product]:
         """
@@ -48,6 +47,11 @@ class Catalogue:
                     break
         
         return matching_products
+    
+    def search_products_by_criteria(self, **search_criteria) -> List[Product]:
+        """Search products using database-level search criteria."""
+        product_ids = self.db.search_products(**search_criteria)
+        return [Product(product_id, self.db) for product_id in product_ids]
     
     #Filtering and sorting
     
