@@ -24,8 +24,8 @@ class Trolley:
                 return True 
             return False
         
-        def totalCost(self):
-            return sum(lineItem.priceAtPurchase for lineItem in self.LineItems)
+        def remove_from_trolley(self, db: Database, product_id: int):
+            return db.remove_from_trolley(self.accountID, product_id)
         
-        def getLineItems(self):
-            return
+        def clear_trolley(self, db: Database):
+            return db.clear_trolley(self.accountID)

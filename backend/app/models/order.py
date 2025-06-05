@@ -5,12 +5,12 @@ class orderManager:
     def __init__(self, accountId: int, addressId, db: Database, trolley: list):
         
         def saveOrder(self):
-            result = db.create_order(accountId, addressId, trolley)
-            return result 
+            orderId = db.create_order(accountId, addressId, trolley)
+            return orderId
         
-        def save_invoice(self):
-
-            return
-        def save_receipt(self): 
-
-            return
+        def save_invoice(self, orderId):
+            result = db.save_invoice(accountId, orderId)
+            return result 
+        def save_receipt(self, orderId):
+            result = db.save_receipt(accountId, orderId)
+            return result 
