@@ -73,9 +73,7 @@ def register_route(
 
 
 @customer_route.get("/trolley")
-def get_trolley_route(
-    customer_data: dict[str, CustomerAccount | str | None] = Depends(get_customer_account)
-):
+def get_trolley_route(customer_data: dict[str, CustomerAccount | str | None] = Depends(get_customer_account)):
     customer: CustomerAccount | str | None = customer_data.get("account")
 
     if not isinstance(customer, CustomerAccount):
@@ -88,10 +86,7 @@ def get_trolley_route(
 
 
 @customer_route.post("/trolley/add")
-def add_to_trolley_route(
-    item: TrollyItem, db: Database = Depends(get_db),
-    customer_data: dict = Depends(get_customer_account)
-):
+def add_to_trolley_route(item: TrollyItem, customer_data: dict = Depends(get_customer_account)):
 
     customer: CustomerAccount | str | None = customer_data.get("account")
 
@@ -112,7 +107,6 @@ def add_to_trolley_route(
 @customer_route.post("/trolley/modify")
 def modify_number_in_trolley(
         item: TrollyItem,
-        db: Database = Depends(get_db),
         customer_data: dict = Depends(get_customer_account)):
     customer: CustomerAccount | str | None = customer_data.get("account")
 
@@ -133,7 +127,6 @@ def modify_number_in_trolley(
 @customer_route.post("/trolley/remove")
 def remove_from_trolley_route(
         item: TrollyItem,
-        db: Database = Depends(get_db),
         customer_data: dict = Depends(get_customer_account)):
     customer: CustomerAccount | str | None = customer_data.get("account")
 
@@ -152,8 +145,7 @@ def remove_from_trolley_route(
 
 
 @customer_route.post("/trolley/clear")
-def clear_trolley_route(db: Database = Depends(get_db),
-                        customer_data: dict = Depends(get_customer_account)):
+def clear_trolley_route(customer_data: dict = Depends(get_customer_account)):
     customer: CustomerAccount | None = customer_data.get("account")
 
     if not isinstance(customer, CustomerAccount):
@@ -207,7 +199,7 @@ def customer_get_address(customer_data: dict = Depends(get_customer_account)):
     return result
 
 
-@customer_route.get("/address/add")
+@customer_route.post("/address/add")
 def customer_add_address(payload: Address,
                          customer_data: dict = Depends(get_customer_account)):
     customer: CustomerAccount | None = customer_data.get("account")
@@ -225,7 +217,7 @@ def customer_add_address(payload: Address,
         detail="Adding an address failed due to an unknown error.")
 
 
-@customer_route.get("/address/remove")
+@customer_route.delete("/address/remove")
 def customer_remove_address(payload: AddressID, customer_data: dict = Depends(get_customer_account)):
     customer: CustomerAccount | None = customer_data.get("account")
 

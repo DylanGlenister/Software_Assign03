@@ -198,6 +198,7 @@ async function setSelectOptions({ endpoint, elements, label = 'Select an option'
         console.log(response)
         return;
     }
+    console.log(response)
     
     elements.forEach(elementId => {
         const selectElement = document.getElementById(elementId);
