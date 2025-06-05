@@ -5,6 +5,10 @@ class Trolley:
     def __init__(self, db: Database, accountID: int):
         self.lineItems = db.get_trolley(accountID)
 
+        def getTrolley():
+            self.lineItems = db.get_trolley(accountID)
+            return 
+
         def addLineItem(self, productID):
             quantity = 1
             for lineItem in self.lineItems:
@@ -16,7 +20,7 @@ class Trolley:
             return
         
         def UpdateQuantity(self, productID: int, newQuantity: int):
-            for lineItemID in self.lineItems:
+            for lineItem in self.lineItems:
                 if newQuantity <= 0:
                     db.remove_from_trolley(accountID, self.lineItem.lineItemId)
                 else:
