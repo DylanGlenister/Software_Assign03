@@ -1,35 +1,52 @@
 from ..core.database import Database
 from .product import Product
 
+
 class Trolley:
     def __init__(self, db: Database, accountID: int):
-        self.lineItems = db.get_trolley(accountID)
+        self.db: Database = db
+        self.accountID: int = accountID
+        self.lineItems: list[dict] = db.get_trolley(accountID)
 
-        def getTrolley():
-            self.lineItems = db.get_trolley(accountID)
-            return 
+    def get_items(self):
+        return self.lineItems
 
-        def addLineItem(self, productID):
-            quantity = 1
-            for lineItem in self.lineItems:
-                if lineItem["productID"] == productID:
-                    lineItem["quantity"] += quantity
-                    db.change_quantity_of_product_in_trolley(accountID, productID, quantity)
-                    return
-            db.add_to_trolley(accountID, productID, quantity)
-            return
-        
-        def UpdateQuantity(self, productID: int, newQuantity: int):
-            for lineItem in self.lineItems:
+    def add_line_item(self, productID: int, quantity: int = 1):
+        for lineItem in self.get_items():
+            if lineItem["productID"] == productID:
+                lineItem["quantity"] += quantity
+                self.db.change_quantity_of_product_in_trolley(
+                    self.accountID, productID, lineItem["quantity"]
+                )
+                return
+
+        self.db.add_to_trolley(self.accountID, productID, quantity)
+        self.lineItems = self.db.get_trolley(self.accountID)
+
+    def update_quantity(self, productID: int, newQuantity: int):
+        for item in self.get_items():
+            if item["productID"] == productID:
                 if newQuantity <= 0:
-                    db.remove_from_trolley(accountID, self.lineItem.lineItemId)
+                    self.db.remove_from_trolley(
+                        self.accountID, item["lineItemID"])
                 else:
-                    db.change_quantity_of_product_in_trolley(accountID, productID, newQuantity)
-                return True 
-            return False
-        
-        def remove_from_trolley(self, db: Database, product_id: int):
-            return db.remove_from_trolley(self.accountID, product_id)
-        
-        def clear_trolley(self, db: Database):
-            return db.clear_trolley(self.accountID)
+                    self.db.change_quantity_of_product_in_trolley(
+                        self.accountID, productID, newQuantity
+                    )
+                self.lineItems = self.db.get_trolley(self.accountID)
+                return True
+        return False
+
+    def remove_from_trolley(self, product_id: int):
+        for lineItem in self.get_items():
+            if lineItem["productID"] == product_id:
+                self.db.remove_from_trolley(
+                    self.accountID, lineItem["lineItemID"])
+                self.lineItems.remove(lineItem)
+                return
+        return "Failed to find"
+
+    def clear_trolley(self):
+        result = self.db.clear_trolley(self.accountID)
+        self.lineItems = []
+        return result
