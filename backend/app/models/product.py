@@ -151,12 +151,23 @@ class Product:
     #take product fields that need to be updated and updates them  and save changes to the database
     #product.update_product(name="newname", price=10)
     def update_product(self, **kwargs) -> bool:
-        """update product attributes"""
-        # Update attributes directly
+        """update product attributes with validation"""
+        
+        # validation
         for field, value in kwargs.items():
-            if hasattr(self, field):
-                setattr(self, field, value)
-    
+            if not hasattr(self, field):
+                raise ValueError(f"invalid field: {field}") #checks updatre field
+            
+            if field == 'price' and value < 0:
+                raise ValueError("price cannot be negative") #check updaate price
+            
+            if field in ['stock', 'available_for_sale'] and value < 0: #available fdor sale cant be negartuve
+                raise ValueError(f"{field} cannot be negative")
+        
+        # Update attributes
+        for field, value in kwargs.items():
+            setattr(self, field, value)
+
         return self.save_to_db()
     
     
