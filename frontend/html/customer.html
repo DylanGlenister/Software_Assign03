@@ -1,7 +1,7 @@
 <div id="customer" class="content-section">
     <div class="section-header">
         <h3>Customer Routes</h3>
-        <p>Customer registration and shopping Trolley management</p>
+        <p>Customer registration, shopping Trolley management, orders, and addresses.</p>
     </div>
 
     <!-- Register -->
@@ -163,7 +163,7 @@
             <span>/customer/trolley/remove</span>
             <p class="endpoint-description">
                 <strong>CREATES A GUEST ACCOUNT IF NOT LOGGED IN</strong><br>
-                Removes x amount of the selected product to the trolley. If more than the ammount of the item is removed, then the item is removed from the trolley. <br>
+                Removes the selected product from the trolley. <br> <!-- Simplified description -->
             </p>
         </div>
         <div class="endpoint-body">
@@ -175,6 +175,140 @@
                 <button type="submit" class="btn btn-primary">Remove from Trolley</button>
             </form>
             <div id="removeFromTrolleyResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Get Orders -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/customer/orders</span>
+            <p class="endpoint-description">
+                Gets all orders for the current logged-in customer. Requires authentication.
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <button id="getOrdersBtn" class="btn btn-primary">Get My Orders</button>
+            <div id="getOrdersResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Table (Orders)</strong></summary>
+                    <div class="table-container"></div><br>
+                </details>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Order -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">POST</span>
+            <span>/customer/order/create</span>
+            <p class="endpoint-description">
+                Creates an order for the current logged-in customer using an existing address ID. Requires authentication.
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <form id="createOrderForm">
+                <div class="form-group">
+                    <label for="createOrderAddressId">Address ID</label>
+                    <input type="number" id="createOrderAddressId" class="form-control" required placeholder="Enter Address ID">
+                    <!-- Consider populating this with a select after fetching addresses -->
+                </div>
+                <button type="submit" class="btn btn-primary">Create Order</button>
+            </form>
+            <div id="createOrderResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Get Addresses -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/customer/address</span>
+            <p class="endpoint-description">
+                Gets all addresses for the current logged-in customer. Requires authentication.
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <button id="getAddressesBtn" class="btn btn-primary">Get My Addresses</button>
+            <div id="getAddressesResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Table (Addresses)</strong></summary>
+                    <div class="table-container"></div><br>
+                </details>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Address -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span> <!-- As per Python route -->
+            <span>/customer/address/add</span>
+            <p class="endpoint-description">
+                Adds an address for the current logged-in customer. Requires authentication. <br>
+                <em>Note: Uses GET with a query parameter as per provided route.</em>
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <form id="addAddressForm">
+                <div class="form-group">
+                    <label for="addAddressValue">Address</label>
+                    <input type="text" id="addAddressValue" class="form-control" required placeholder="Enter full address">
+                </div>
+                <button type="submit" class="btn btn-primary">Add Address</button>
+            </form>
+            <div id="addAddressResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Remove Address -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span> <!-- As per Python route -->
+            <span>/customer/address/remove</span>
+            <p class="endpoint-description">
+                Removes an address by ID for the current logged-in customer. Requires authentication. <br>
+                <em>Note: Uses GET with a query parameter as per provided route.</em>
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <form id="removeAddressForm">
+                <div class="form-group">
+                    <label for="removeAddressIdValue">Address ID</label>
+                    <input type="number" id="removeAddressIdValue" class="form-control" required placeholder="Enter Address ID to remove">
+                </div>
+                <button type="submit" class="btn btn-primary">Remove Address</button>
+            </form>
+            <div id="removeAddressResponse" class="response-container" style="display: none;">
                 <br><h3>Response:</h3><br>
                 <details open>
                     <summary><strong>Raw JSON Response</strong></summary><br>

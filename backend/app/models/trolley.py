@@ -15,13 +15,16 @@ class Trolley:
         for lineItem in self.get_items():
             if lineItem["productID"] == productID:
                 lineItem["quantity"] += quantity
-                self.db.change_quantity_of_product_in_trolley(
+                return self.db.change_quantity_of_product_in_trolley(
                     self.accountID, productID, lineItem["quantity"]
                 )
-                return
-
-        self.db.add_to_trolley(self.accountID, productID, quantity)
-        self.lineItems = self.db.get_trolley(self.accountID)
+                
+        if self.db.add_to_trolley(self.accountID, productID, quantity):
+            self.lineItems = self.db.get_trolley(self.accountID)
+            return True
+        
+        return False
+        
 
     def update_quantity(self, productID: int, newQuantity: int):
         for item in self.get_items():

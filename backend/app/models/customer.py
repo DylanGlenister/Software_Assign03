@@ -8,6 +8,7 @@ from pydantic import EmailStr
 from ..core.database import Database, Role, Status
 from .account import Account
 from .trolley import Trolley
+from .order import OrderManager
 
 
 class CustomerAccount(Account):
@@ -17,13 +18,14 @@ class CustomerAccount(Account):
         creationDate: str,
         role: Role,
         status: Status,
-        email: str | None,
+        email: EmailStr | None,
         password: str | None,
         firstname: str | None,
         lastname: str | None,
         db: Database,
     ):
         self.trolley: Trolley = Trolley(db, accountID)
+        self.db: Database = db
 
         super().__init__(
             accountID,
@@ -75,7 +77,7 @@ class CustomerAccount(Account):
                 detail="An unknown issue caused account creation to fail.",
             )
 
-        account_details = db.get_account(_accountId=accountID)
+        account_details = db.get_account(accountId=accountID)
         assert account_details
 
         return cls(db=db, **account_details)
@@ -91,12 +93,34 @@ class CustomerAccount(Account):
                 detail="An unknown issue caused guest account creation to fail.",
             )
 
-        account_details = db.get_account(_accountId=accountID)
+        account_details = db.get_account(accountId=accountID)
         assert account_details
 
         return cls(db=db, **account_details)
 
-    def create_order(self, db: Database, addressID: int, order_manager):
-        orderID = db.create_order(self.accountID, addressID)
+    def create_order(self, address_id: int) -> int:
+        order_manager = OrderManager(self.accountID, address_id, self.db)
+        return order_manager.create_order()
 
-        # logic when order manager is done
+    def add_address(self, address: str):
+        return self.db.create_address(self.accountID, address.strip())
+
+    def get_addresses(self):
+        return self.db.get_addresses(self.accountID)
+
+    def remove_address(self, address_id: int):
+        addresses = self.get_addresses() or []
+
+        has_address = False
+        for address in addresses:
+            if address.get("addressID") == address_id: 
+                has_address = True
+                break
+        
+        if not has_address:
+            raise HTTPException(
+                status_code=httpStatus.HTTP_404_NOT_FOUND,
+                detail="Address not found or you do not have permission to delete this address.",
+            )
+
+        return self.db.delete_address(address_id)

@@ -13,14 +13,13 @@ customer_route = APIRouter(
     tags=["customer"])
 
 
-def get_customer_account(
-        token: Optional[str] = Depends(get_token),
-        db: Database = Depends(get_db)) -> dict[str, CustomerAccount | str | None]:
+def get_customer_account(token: Optional[str] = Depends(get_token),
+                         db: Database = Depends(get_db)) -> dict[str, CustomerAccount | str | None]:
     if token:
         account_data: dict = get_account_data(token, db)
         # NOTE Dom is this correct? I feel like this should return the token right?
         # NOTE Yea, i know what im doing :)
-        return {"account": CustomerAccount(**account_data), "token": None}
+        return {"account": CustomerAccount(db=db, **account_data), "token": None}
 
     # Create guest account
     guest_account: CustomerAccount = CustomerAccount.create_guest(db)
@@ -43,6 +42,11 @@ class TrollyItem(BaseModel):
     product_id: int
     amount: int = 1
 
+class AddressID(BaseModel):
+    address_id: int
+
+class Address(BaseModel):
+    address: str
 
 @customer_route.post("/register")
 def register_route(
@@ -97,8 +101,7 @@ def add_to_trolley_route(
     result: dict = {"token": customer_data.get("token")}
 
     success: bool = bool(
-        customer.trolley.add_line_item(
-            db, item.product_id, item.amount))
+        customer.trolley.add_line_item(item.product_id, item.amount))
     if success:
         result["message"] = "Item has been added to the trolley"
     else:
@@ -119,8 +122,7 @@ def modify_number_in_trolley(
     result: dict = {"token": customer_data.get("token")}
 
     success: bool = bool(
-        customer.trolley.update_quantity(
-            db, item.product_id, item.amount))
+        customer.trolley.update_quantity(item.product_id, item.amount))
     if success:
         result["message"] = "Item quantity has been modified in the trolley"
     else:
@@ -141,8 +143,7 @@ def remove_from_trolley_route(
     result: dict = {"token": customer_data.get("token")}
 
     success: bool = bool(
-        customer.trolley.remove_from_trolley(
-            db, item.product_id))
+        customer.trolley.remove_from_trolley(item.product_id))
     if success:
         result["message"] = "Item has been removed from the trolley"
     else:
@@ -153,16 +154,88 @@ def remove_from_trolley_route(
 @customer_route.post("/trolley/clear")
 def clear_trolley_route(db: Database = Depends(get_db),
                         customer_data: dict = Depends(get_customer_account)):
-    customer: CustomerAccount | str | None = customer_data.get("account")
+    customer: CustomerAccount | None = customer_data.get("account")
 
     if not isinstance(customer, CustomerAccount):
         raise ValueError('Unknown error retrieving customer data')
 
     result: dict = {"token": customer_data.get("token")}
 
-    success: bool = bool(customer.trolley.clear_trolley(db))
+    success: bool = bool(customer.trolley.clear_trolley())
     if success:
         result["message"] = "Trolley has been cleared"
     else:
         result["error"] = "Failed to clear trolley"
     return result
+
+
+@customer_route.get("/orders")
+def customer_get_orders(db: Database = Depends(get_db),
+                        customer_data: dict = Depends(get_customer_account)):
+    customer: CustomerAccount | None = customer_data.get("account")
+
+    if not isinstance(customer, CustomerAccount):
+        raise ValueError('Unknown error retrieving customer data')
+    
+    result: dict = {"token": customer_data.get("token")}
+    result["orders"] = db.get_orders_from_account(customer.accountID) # an array of orders
+
+    return result
+
+@customer_route.post("/order/create")
+def customer_create_order(payload: AddressID, customer_data: dict = Depends(get_customer_account)):
+    customer: CustomerAccount | None = customer_data.get("account")
+
+    if not isinstance(customer, CustomerAccount):
+        raise ValueError('Unknown error retrieving customer data')
+    
+    result: dict = {"token": customer_data.get("token")}
+    
+    result["order_id"] = customer.create_order(payload.address_id)
+    return result
+
+
+@customer_route.get("/address")
+def customer_get_address(customer_data: dict = Depends(get_customer_account)):
+    customer: CustomerAccount | None = customer_data.get("account")
+
+    if not isinstance(customer, CustomerAccount):
+        raise ValueError('Unknown error retrieving customer data')
+    
+    result: dict = {"token": customer_data.get("token")}
+    result["addresses"] = customer.get_addresses() #array of addresses
+    return result
+
+
+@customer_route.get("/address/add")
+def customer_add_address(payload: Address,
+                         customer_data: dict = Depends(get_customer_account)):
+    customer: CustomerAccount | None = customer_data.get("account")
+
+    if not isinstance(customer, CustomerAccount):
+        raise ValueError('Unknown error retrieving customer data')
+    
+    result: dict = {"token": customer_data.get("token")}
+    
+    if customer.add_address(payload.address):
+        return result
+    
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Adding an address failed due to an unknown error.")
+
+
+@customer_route.get("/address/remove")
+def customer_remove_address(payload: AddressID, customer_data: dict = Depends(get_customer_account)):
+    customer: CustomerAccount | None = customer_data.get("account")
+
+    if not isinstance(customer, CustomerAccount):
+        raise ValueError('Unknown error retrieving customer data')
+    
+    result: dict = {"token": customer_data.get("token")}
+    if customer.remove_address(payload.address_id):
+        return result
+    
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Removing an address failed due to an unknown error.")
