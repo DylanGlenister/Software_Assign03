@@ -1,20 +1,33 @@
-from typing import Optional, Type
-from pydantic import EmailStr, ValidationError
-from bcrypt import checkpw, gensalt, hashpw
 import re
+from typing import Optional, Type
+import datetime
+
+from bcrypt import checkpw, gensalt, hashpw
+from pydantic import EmailStr, ValidationError
 
 from ..core.database import Database, Role, Status
+from ..utils.fields import filter_dict
+
 
 class Account:
-	def __init__(self, accountID, email, password, firstname, lastname, creationDate, role: Role, status: Status):
-		self.accountID = accountID
-		self.email = email
-		self.password = password
-		self.firstname = firstname
-		self.lastname = lastname
-		self.creationDate = creationDate
+	def __init__(self,
+		accountID: int,
+		creationDate : str,
+		role: Role,
+		status: Status,
+		email: str | None,
+		password: str | None,
+		firstname: str | None,
+		lastname : str | None
+	):
+		self.accountID: int = accountID
+		self.creationDate: str = creationDate
 		self.role: Role = role
 		self.status: Status = status
+		self.email: str | None = email
+		self.password: str | None = password
+		self.firstname: str | None = firstname
+		self.lastname: str | None = lastname
 
 	@classmethod
 	def _hash_password(cls, password: str) -> str:
@@ -25,7 +38,7 @@ class Account:
 	@classmethod
 	def login(cls: Type["Account"], db: Database, email: EmailStr, password: str) -> Optional["Account"]:
 		"""Attempt to find an account with matching email and password."""
-		account: dict = db.get_account(_email=email)
+		account: dict | None = db.get_account(_email=email)
 		if not account:
 			print("No account found with that email.")
 			return None
@@ -44,7 +57,7 @@ class Account:
 		else:
 			print(f"Password '${password}' is incorrect.")
 			return None
-	
+
 	@classmethod
 	def verify_password(cls, password):
 		errors = []
@@ -83,33 +96,25 @@ class Account:
 
 		return user in required_roles
 
-	def update_info(self, db: Database, **fields) -> bool:
-		valid_fields: dict = {"email", "status", "firstname", "lastname"}
+	def update_info(self, db: Database, **fields) -> dict:
+		filtered_fields = filter_dict(fields, {"email", "status", "firstname", "lastname"})
 
-		filtered_fields: dict = {}
-		for key, value in fields.items():
-			if key in valid_fields:
-				filtered_fields[key] = value
-			else:
-				print(f"Ignored invalid field: {key}")
+		if not filtered_fields:
+			return {"error": "No valid fields to update."}
 
 		if "email" in filtered_fields:
 			try:
 				filtered_fields["email"] = str(filtered_fields["email"].strip().lower())
 			except ValidationError:
 				return {"error": "Invalid email format."}
-		
+
 		if "status" in filtered_fields:
 			try:
 				filtered_fields["status"] = Role(filtered_fields["status"])
 			except ValidationError:
 				raise ValidationError(["Status does not exist"])
 
-
-		if not filtered_fields:
-			return {"error": "No valid fields to update."}
-		
-		success: bool = db.update_account(self.accountID, **filtered_fields)
+		success: bool = bool(db.update_account(self.accountID, **filtered_fields))
 
 		if success:
 			for key, value in filtered_fields.items():
@@ -123,7 +128,7 @@ class Account:
 
 		try:
 			hashed: str = self._hash_password(new_password)
-			success: bool = db.update_account(self.accountID, password=hashed)
+			success: bool = bool(db.update_account(self.accountID, password=hashed))
 
 			if not success:
 				raise RuntimeError("Failed to update password in database")

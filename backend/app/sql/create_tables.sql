@@ -48,13 +48,13 @@ CREATE TABLE `Product` (
 
 CREATE TABLE `Account` (
 	`accountID` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	`email` VARCHAR(255) NOT NULL,
-	`password` VARCHAR(255) NOT NULL,
-	`firstname` VARCHAR(50) DEFAULT NULL,
-	`lastname` VARCHAR(50) DEFAULT NULL,
 	`creationDate` DATETIME NOT NULL,
 	`role` enum('owner', 'admin', 'employee', 'customer', 'guest') NOT NULL DEFAULT 'guest',
-	`status` enum('unverified', 'active', 'inactive', 'condemned') NOT NULL DEFAULT 'unverified'
+	`status` enum('unverified', 'active', 'inactive', 'condemned') NOT NULL DEFAULT 'unverified',
+	`email` VARCHAR(255) DEFAULT NULL,
+	`password` VARCHAR(255) DEFAULT NULL,
+	`firstname` VARCHAR(50) DEFAULT NULL,
+	`lastname` VARCHAR(50) DEFAULT NULL
 ) ENGINE=InnoDB;
 
 # Deleting an account will automatically delete all associated addresses.

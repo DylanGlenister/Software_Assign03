@@ -1,27 +1,35 @@
+from ..core.database import Database
+from .product import Product
 
 class Trolley:
-    def __init__(self, accountId: int):
+    def __init__(self, db: Database, accountID: int):
+        self.lineItems = db.get_trolley(accountID)
 
+        def getTrolley():
+            self.lineItems = db.get_trolley(accountID)
+            return 
 
-        def addLineItem(self, productId):
+        def addLineItem(self, productID):
             quantity = 1
             for lineItem in self.lineItems:
-                if lineItem.product.productID == product.poroductID:
-                    lineItem.quantity += quantity
+                if lineItem["productID"] == productID:
+                    lineItem["quantity"] += quantity
+                    db.change_quantity_of_product_in_trolley(accountID, productID, quantity)
                     return
-            self.lineItems.append(lineItem(product, quantity))
+            db.add_to_trolley(accountID, productID, quantity)
+            return
         
-        def UpdateQuantity(self, productID, newQuantity):
+        def UpdateQuantity(self, productID: int, newQuantity: int):
             for lineItem in self.lineItems:
                 if newQuantity <= 0:
-                    self.lineItems.remove(lineItem)
+                    db.remove_from_trolley(accountID, self.lineItem.lineItemId)
                 else:
-                    lineItem.quantity = newQuantity
+                    db.change_quantity_of_product_in_trolley(accountID, productID, newQuantity)
                 return True 
             return False
         
-        def totalCost(self):
-            return sum(lineItem.price for lineItem in self.LineItems)
+        def remove_from_trolley(self, db: Database, product_id: int):
+            return db.remove_from_trolley(self.accountID, product_id)
         
-        def getLineItems(self):
-            return  a<
+        def clear_trolley(self, db: Database):
+            return db.clear_trolley(self.accountID)

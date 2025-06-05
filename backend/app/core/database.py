@@ -5,7 +5,16 @@ from typing import Any, Generator, TypeAlias
 import mariadb
 from fastapi import HTTPException, status
 
+from ..utils.fields import filter_dict
 from ..utils.settings import SETTINGS
+
+#def filter_dict(data: dict, valid_keys: set, /, *, log_invalid: bool = True) -> dict:
+#	filtered = {k: v for k, v in data.items() if k in valid_keys}
+#	if log_invalid:
+#		invalid = set(data.keys()) - valid_keys
+#		for key in invalid:
+#			print(f"Ignored invalid field: {key}")
+#	return filtered
 
 #class MockSettings:
 #	database_username: str = 'admin'
@@ -265,14 +274,14 @@ class Database:
 
 		if _accountId is not None:
 			query = '''
-				SELECT accountID, email, password, firstname, lastname, creationDate, role, status
+				SELECT accountID, creationDate, role, status, email, password, firstname, lastname
 				FROM Account
 				WHERE accountID = %s
 			'''
 			params = (_accountId,)
 		else: # _email is not None
 			query = '''
-				SELECT accountID, email, password, firstname, lastname, creationDate, role, status
+				SELECT accountID, creationDate, role, status, email, password, firstname, lastname
 				FROM Account
 				WHERE email = %s
 			'''
@@ -325,9 +334,9 @@ class Database:
 
 	def create_account(
 		self,
-		_email: str,
-		_password: str,
 		_role: Role = Role.GUEST,
+		_email: str | None = None,
+		_password: str | None = None,
 		/,
 		_firstName: str | None = None,
 		_lastName: str | None = None,
@@ -338,9 +347,9 @@ class Database:
 		Creates a new account.
 
 		Args:
-			_email: The email for the new account.
-			_password: The hashed password for the new account.
 			_role: The role for the new account (defaults to GUEST).
+			_email: The email for the new account (Optional).
+			_password: The hashed password for the new account (Optional).
 			_firstName: Optional first name.
 			_lastName: Optional last name.
 			_creationDate: Optional creation date (defaults to datetime.now()).
@@ -353,10 +362,10 @@ class Database:
 		"""
 		creation_date_str = _creationDate.strftime('%Y-%m-%d %H:%M:%S')
 		query = '''
-			INSERT INTO Account (email, password, firstname, lastname, creationDate, role)
+			INSERT INTO Account (creationDate, role, email, password, firstname, lastname)
 			VALUES (%s, %s, %s, %s, %s, %s)
 		'''
-		params = (_email, _password, _firstName, _lastName, creation_date_str, _role.value)
+		params = (creation_date_str, _role.value, _email, _password, _firstName, _lastName)
 		try:
 			account_id = self._execute(query, params, _returnLastId=True)
 			if account_id is None:
@@ -384,8 +393,7 @@ class Database:
 			ValueError: If no valid fields to update are provided.
 			Exception: If the update operation fails.
 		"""
-		allowed_fields = {'email', 'password', 'firstname', 'lastname', 'role', 'status'}
-		valid_fields = {k: v for k, v in _fields.items() if k in allowed_fields}
+		valid_fields = filter_dict(_fields, {'email', 'password', 'firstname', 'lastname', 'role', 'status'})
 
 		if not valid_fields:
 			raise ValueError('No valid fields to update')
@@ -619,8 +627,7 @@ class Database:
 			ValueError: If no valid fields are provided.
 			Exception: If the update operation fails.
 		"""
-		allowed_fields = {'name', 'description', 'price', 'stock', 'available', 'discontinued'}
-		valid_fields = {k: v for k, v in _fields.items() if k in allowed_fields}
+		valid_fields = filter_dict(_fields, {'name', 'description', 'price', 'stock', 'available', 'discontinued'})
 
 		if not valid_fields:
 			raise ValueError('No valid fields provided for update_product.')
@@ -982,7 +989,7 @@ class Database:
 		'''
 		return self._fetch_all(query, (_accountId,))
 
-	def add_to_trolley(self, _accountId: Id, _productId: Id, /, *, _quantity: int = 1) -> Id:
+	def add_to_trolley(self, _accountId: Id, _productId: Id, /, _quantity: int = 1) -> Id:
 		"""
 		Adds a product to an account's trolley. This is an atomic operation.
 
@@ -1232,6 +1239,54 @@ class Database:
 			print(f'Error in create_order: {e}')
 			self.rollback()
 			raise
+
+	def get_order(self, orderID: Id, /) -> DictRow | None:
+		"""
+		Retrieves an order by its ID.
+
+		Args:
+			orderID: The ID of the order.
+
+		Returns:
+			A dictionary containing order data, or None if not found or error.
+		"""
+		query='''
+			SELECT orderID, accountID, addressID, date
+			FROM Order
+			WHERE orderID = %s
+		'''
+		return self._fetch_one(query, (orderID,))
+
+	def get_orders(self) -> list[DictRow] | None:
+		"""
+		Retrieves all orders from the database.
+
+		Returns:
+			A list containing all the orders. Returns empty list if none. Returns None on error.
+		"""
+		query='''
+			SELECT orderID, accountID, addressID, date
+			FROM Order
+		'''
+		return self._fetch_all(query, ())
+
+	def get_order_from_accounts(self, accountID: Id, /) -> list[DictRow] | None:
+		"""
+		Retrieves all orders made by an account.
+
+		Args:
+			accountID: The ID of the account to be sorted by.
+
+		Returns:
+			A list containing all the orders. Returns empty list if none. Returns None on error.
+		"""
+		query='''
+			SELECT o.orderID, o.accountID, o.addressID, o.date
+			FROM Order o
+			JOIN `Account` a ON o.accountID = a.accountID
+			WHERE o.accountID = %s
+		'''
+		return self._fetch_all(query, (accountID,))
 
 	# --- Invoice Management ---
 
@@ -1496,7 +1551,7 @@ class DatabaseTests:
 		print('Testing: Account CRUD')
 		test_email = f'acc_test_{datetime.now().timestamp()}@example.com'
 		# Create
-		acc_id = db.create_account(test_email, 'password', Role.CUSTOMER, _firstName='Acc', _lastName='Test')
+		acc_id = db.create_account(Role.CUSTOMER, test_email, 'password', _firstName='Acc', _lastName='Test')
 		assert isinstance(acc_id, int), 'create_account failed'
 		# Read (single)
 		acc = db.get_account(_accountId=acc_id)
@@ -1514,7 +1569,7 @@ class DatabaseTests:
 
 	def test_address_crud_operations(self, db: Database):
 		print('Testing: Address CRUD')
-		acc_id = db.create_account(f'addr_test_{datetime.now().timestamp()}@example.com', 'pw')
+		acc_id = db.create_account(Role.GUEST, f'addr_test_{datetime.now().timestamp()}@example.com', 'pw')
 		# Create
 		addr_id = db.create_address(acc_id, '123 Test Lane')
 		assert isinstance(addr_id, int), 'create_address failed'
@@ -1613,7 +1668,7 @@ class DatabaseTests:
 
 	def test_trolley_lineitem_order_workflow(self, db: Database):
 		print('Testing: Full Trolley-Order Workflow')
-		acc_id = db.create_account(f'workflow_user_{datetime.now().timestamp()}@example.com', 'pw')
+		acc_id = db.create_account(Role.GUEST, f'workflow_user_{datetime.now().timestamp()}@example.com', 'pw')
 		addr_id = db.create_address(acc_id, '1 Workflow St')
 		prod1_id = db.add_product('WorkflowProd1', 'P1', 10.0, _stock=10, _available=10)
 		prod2_id = db.add_product('WorkflowProd2', 'P2', 20.0, _stock=10, _available=10)
@@ -1649,7 +1704,7 @@ class DatabaseTests:
 
 	def test_financial_document_management(self, db: Database):
 		print('Testing: Invoice, Receipt, Report Management')
-		acc_id = db.create_account(f'docs_user_{datetime.now().timestamp()}@example.com', 'pw')
+		acc_id = db.create_account(Role.GUEST, f'docs_user_{datetime.now().timestamp()}@example.com', 'pw')
 		addr_id = db.create_address(acc_id, '1 Docs St')
 		prod_id = db.add_product('DocsProd', 'P', 1.0, _stock=1, _available=1)
 		db.add_to_trolley(acc_id, prod_id, _quantity=1)
