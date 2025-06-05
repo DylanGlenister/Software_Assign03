@@ -10,19 +10,23 @@ class Catalogue:
     def __init__(self, db: Database):
         """Initialize catalogue with database connection."""
         self.db = db
-        self._products = []
+        self._products: list[Product] = []
 
-    def get_all_products(self):
-        """Get all products from database."""
-        products = self.db.get_products()
+    def get_all_products(self) -> None:
+        """
+        Get all products from the database and update the internal list.
 
-        if not products:
+        Raises:
+            ValueError: If no products are found or if a product ID is missing.
+        """
+        products_data = self.db.get_products()
+
+        if not products_data:
             raise ValueError('No products found in database')
 
         self._products = []
-
-        for product in products:
-            product_id = product.get('productID')
+        for product_item in products_data:
+            product_id = product_item.get('productID')
 
             if not product_id:
                 raise ValueError('Unknown error reading productID')
@@ -32,67 +36,97 @@ class Catalogue:
     def search_products(self, search_term: str, /) -> list[Product]:
         """
         Search products by name, description, or tags.
+
+        Args:
+            search_term: The term to search for. Case-insensitive.
+
+        Returns:
+            A list of products matching the search term. If search_term
+            is empty, returns all products currently in the catalogue.
         """
         if not search_term:
             return self._products
 
-        search_term = search_term.lower()
-        matching_products = []
+        search_term_lower = search_term.lower()
+        matching_products: list[Product] = []
 
         for product in self._products:
-            # Check name
-            if search_term in product.name.lower():
+            if search_term_lower in product.name.lower():
                 matching_products.append(product)
                 continue
 
-            # Check description
-            if search_term in product.description.lower():
+            if search_term_lower in product.description.lower():
                 matching_products.append(product)
                 continue
 
-            # Check tags
             for tag in product.tags:
-                if search_term in tag.lower():
+                if search_term_lower in tag.lower():
                     matching_products.append(product)
-                    break
+                    break  # Found a match in tags, move to next product
 
         return matching_products
 
-    def get_products_by_tag(self, *tags):
+    def get_products_by_tag(self, *tags) -> None:
         """
-        Search products using database-level search criteria.
+        Fetch products by tags and update the internal product list.
+
+        This method uses a database-level search to find products matching
+        the provided tags and then refreshes `self._products` with these findings.
 
         Args:
-                tags: A list of tags used to filter the products.
+            *tags: One or more tags to filter products by.
 
-        Returns:
-                A list of products.
+        Raises:
+            ValueError: If no products are found for the given tags or
+                        if a product ID is missing.
         """
-        products = self.db.get_products(*tags)
+        products_data = self.db.get_products(*tags)
 
-        if not products:
-            raise ValueError('No products found in database')
+        if not products_data:
+            raise ValueError(
+                'No products found in database for the given tags')
 
         self._products = []
-
-        for product in products:
-            product_id = product.get('productID')
+        for product_item in products_data:
+            product_id = product_item.get('productID')
 
             if not product_id:
                 raise ValueError('Unknown error reading productID')
 
             self._products.append(Product(product_id, self.db))
 
-    #Filtering and sorting
+    # Filtering and sorting
 
-    def filter_by_availability(self, products: list[Product], /):
+    def filter_by_availability(self, products: list[Product], /) -> None:
         """
-        Filter products to show only those available for sale.
-        """
-        self._products = [product for product in products if product.available_for_sale >= 1]
+        Filter a given list of products for availability.
 
-    def sort_by_price(self, products: list[Product], low_to_high: bool = True, /):
+        The filtered list, containing only products with available stock
+        (available_for_sale >= 1), updates the internal `self._products` list.
+
+        Args:
+            products: The list of products to filter.
         """
-        Sort products by price.
+        self._products = [
+            product for product in products
+            if product.available_for_sale >= 1
+        ]
+
+    def sort_by_price(
+        self, products: list[Product], low_to_high: bool = True, /
+    ) -> None:
         """
-        self._products = sorted(products, key=lambda p: p.price, reverse=not low_to_high)
+        Sort a given list of products by price.
+
+        The sorted list updates the internal `self._products` list.
+
+        Args:
+            products: The list of products to sort.
+            low_to_high: If True, sort from low to high price;
+                         otherwise, sort from high to low.
+        """
+        self._products = sorted(
+            products,
+            key=lambda p: p.price,
+            reverse=not low_to_high
+        )
