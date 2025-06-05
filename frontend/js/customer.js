@@ -2,6 +2,7 @@ function initCustomer() {
     document.getElementById('registerForm')?.addEventListener('submit', handleRegister);
     document.getElementById('getTrolleyBtn')?.addEventListener('click', getTrolley);
     document.getElementById('addToTrolleyForm')?.addEventListener('submit', handleAddToTrolley);
+    document.getElementById('modifyItemInTrolleyForm')?.addEventListener('submit', handleModifyItemInTrolley);
     document.getElementById('removeFromTrolleyForm')?.addEventListener('submit', handleRemoveFromTrolley);
     document.getElementById('clearTrolleyBtn')?.addEventListener('click', clearTrolley);
     document.getElementById('fillRegisterDataBtn')?.addEventListener('click', fillRegisterData);
@@ -35,9 +36,9 @@ async function handleRegister(e) {
 async function getTrolley() {
     const response = await makeRequest('/customer/trolley', 'GET', null, true);
     if (response.ok) {
-        showNotification('Shopping cart retrieved successfully!', 'success');
+        showNotification('Shopping trolley retrieved successfully!', 'success');
     } else {
-        showNotification('Failed to retrieve shopping cart!', 'error');
+        showNotification('Failed to retrieve shopping trolley!', 'error');
     }
 
     if (response.data && response.data.token != null) {
@@ -46,7 +47,7 @@ async function getTrolley() {
         localStorage.setItem('authToken', AUTH_TOKEN);
     }
 
-    
+
     displayResponse('getTrolleyResponse', response);
     createTable('getTrolleyResponse', response.data.trolley);
 }
@@ -57,20 +58,31 @@ async function handleAddToTrolley(e) {
     const productId = parseInt(document.getElementById('addProductId').value);
     const amount = parseInt(document.getElementById('addAmount').value);
     const response = await makeRequest('/customer/trolley/add', 'POST', { product_id: productId, amount: amount }, true);
-    if (response.ok) showNotification('Item added to cart successfully!', 'success');
-    else showNotification('Failed to add item to cart!', 'error');
+    if (response.ok) showNotification('Item added to trolley successfully!', 'success');
+    else showNotification('Failed to add item to trolley!', 'error');
     displayResponse('addToTrolleyResponse', response);
     setFormLoading('addToTrolleyForm', false);
+}
+
+async function handleModifyItemInTrolley(e) {
+    e.preventDefault();
+    setFormLoading('modifyItemInTrolleyForm', true);
+    const productId = parseInt(document.getElementById('modifyProductId').value);
+    const amount = parseInt(document.getElementById('modifyAmount').value);
+    const response = await makeRequest('/customer/trolley/modify', 'POST', { product_id: productId, amount: amount }, true);
+    if (response.ok) showNotification('Item modified in trolley successfully!', 'success');
+    else showNotification('Failed to modify item in trolley!', 'error');
+    displayResponse('modifyItemInTrolleyResponse', response);
+    setFormLoading('modifyItemInTrolleyForm', false);
 }
 
 async function handleRemoveFromTrolley(e) {
     e.preventDefault();
     setFormLoading('removeFromTrolleyForm', true);
     const productId = parseInt(document.getElementById('removeProductId').value);
-    const amount = parseInt(document.getElementById('removeAmount').value);
-    const response = await makeRequest('/customer/trolley/remove', 'POST', { product_id: productId, amount: amount }, true);
-    if (response.ok) showNotification('Item removed from cart successfully!', 'success');
-    else showNotification('Failed to remove item from cart!', 'error');
+    const response = await makeRequest('/customer/trolley/remove', 'POST', { product_id: productId }, true);
+    if (response.ok) showNotification('Item removed from trolley successfully!', 'success');
+    else showNotification('Failed to remove item from trolley!', 'error');
     displayResponse('removeFromTrolleyResponse', response);
     setFormLoading('removeFromTrolleyForm', false);
 }
@@ -81,8 +93,8 @@ async function clearTrolley() {
         return;
     }
     const response = await makeRequest('/customer/trolley/clear', 'POST', null, true);
-    if (response.ok) showNotification('Shopping cart cleared successfully!', 'success');
-    else showNotification('Failed to clear shopping cart!', 'error');
+    if (response.ok) showNotification('Shopping trolley cleared successfully!', 'success');
+    else showNotification('Failed to clear shopping trolley!', 'error');
     displayResponse('clearTrolleyResponse', response);
 }
 

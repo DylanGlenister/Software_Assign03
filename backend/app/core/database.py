@@ -274,14 +274,14 @@ class Database:
 
 		if _accountId is not None:
 			query = '''
-				SELECT accountID, email, password, firstname, lastname, creationDate, role, status
+				SELECT accountID, creationDate, role, status, email, password, firstname, lastname
 				FROM Account
 				WHERE accountID = %s
 			'''
 			params = (_accountId,)
 		else: # _email is not None
 			query = '''
-				SELECT accountID, email, password, firstname, lastname, creationDate, role, status
+				SELECT accountID, creationDate, role, status, email, password, firstname, lastname
 				FROM Account
 				WHERE email = %s
 			'''
