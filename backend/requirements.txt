@@ -2,8 +2,9 @@ fastapi
 uvicorn
 mariadb
 python-dotenv
-pydantic-settings 
+pydantic-settings
 pydantic[email]
 bcrypt
 pyjwt
 passlib
+autopep8
