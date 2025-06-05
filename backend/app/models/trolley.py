@@ -1,6 +1,5 @@
 from .core.database import Database
 from .product import Product
-from .lineitem import LineItem
 
 class Trolley:
     def __init__(self, db: Database, accountID: int):
@@ -21,7 +20,7 @@ class Trolley:
                 if newQuantity <= 0:
                     db.remove_from_trolley(accountID, lineItem.lineItemId)
                 else:
-                    lineItem.quantity = newQuantity
+                    db.change_quantity_of_product_in_trolley(accountID, productID, newQuantity)
                 return True 
             return False
         
