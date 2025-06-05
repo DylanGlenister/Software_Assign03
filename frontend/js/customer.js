@@ -108,61 +108,22 @@ function groupOrders(orderItems) {
     if (!orderItems || orderItems.length === 0) return {};
     const orders = {};
     orderItems.forEach(item => {
-        const { orderID, accountID, addressID, date, lineItemID, productID, quantity, priceAtSale } = item;
+        console.log(item)
+        const { orderID, accountID, addressID, date, lineItemID, productID, quantity, priceAtSale, name, location } = item;
         if (!orders[orderID]) {
             orders[orderID] = {
                 orderID,
                 accountID,
                 addressID,
+                location,
                 date,
                 items: []
             };
         }
-        orders[orderID].items.push({ lineItemID, productID, quantity, priceAtSale });
+        orders[orderID].items.push({ lineItemID, productID, quantity, priceAtSale, name });
     });
     return orders;
 }
-
-function createOrderTable(dataArray) {
-    if (!dataArray || dataArray.length === 0) {
-        const p = document.createElement('p');
-        p.textContent = 'No data to display.';
-        return p;
-    }
-
-    const table = document.createElement('table');
-    table.className = 'table table-striped table-bordered table-sm';
-    table.style.width = '100%';
-    table.style.marginTop = '10px';
-
-    const thead = table.createTHead();
-    const headerRow = thead.insertRow();
-
-    const columnMapping = {
-        productID: "Product ID",
-        quantity: "Quantity",
-        priceAtSale: "Price at Sale",
-        lineItemID: "Line Item ID"
-    };
-    const headers = Object.keys(dataArray[0]).filter(key => columnMapping[key]);
-
-    headers.forEach(key => {
-        const th = document.createElement('th');
-        th.textContent = columnMapping[key];
-        headerRow.appendChild(th);
-    });
-
-    const tbody = table.createTBody();
-    dataArray.forEach(rowData => {
-        const row = tbody.insertRow();
-        headers.forEach(key => {
-            const cell = row.insertCell();
-            cell.textContent = rowData[key];
-        });
-    });
-    return table;
-}
-
 
 async function handleGetOrders() {
     if (!AUTH_TOKEN) {
@@ -171,7 +132,7 @@ async function handleGetOrders() {
     }
     const response = await makeRequest('/customer/orders', 'GET', null, true);
     
-    displayResponse('getOrdersResponse', response); // Display raw JSON
+    displayResponse('getOrdersResponse', response);
 
     const ordersOuterContainer = document.getElementById('getOrdersResponse');
     const allOrdersDisplayContainer = ordersOuterContainer?.querySelector('.table-container'); 
@@ -210,7 +171,7 @@ async function handleGetOrders() {
                 orderInfoDiv.style.marginBottom = '10px';
                 orderInfoDiv.innerHTML = `
                     <p style="margin: 3px 0; font-size: 0.9em;"><strong>Date:</strong> ${new Date(orderData.date).toLocaleString()}</p>
-                    <p style="margin: 3px 0; font-size: 0.9em;"><strong>Address ID:</strong> ${orderData.addressID}</p>
+                    <p style="margin: 3px 0; font-size: 0.9em;"><strong>Address ID:</strong> ${orderData.addressID} (${orderData.location})</p>
                 `;
                 orderWrapperDiv.appendChild(orderInfoDiv);
 
@@ -219,15 +180,15 @@ async function handleGetOrders() {
                 itemsTitleH5.style.marginTop = '15px';
                 itemsTitleH5.style.marginBottom = '5px';
                 orderWrapperDiv.appendChild(itemsTitleH5);
-                
-                // Append the orderWrapperDiv to the main display container *before* creating the table for its items.
-                // This ensures the itemsTableHostDiv will be in the DOM when createTable tries to find it.
+
                 allOrdersDisplayContainer.appendChild(orderWrapperDiv);
 
 
                 if (orderData.items.length > 0) {
+                    console.log(orderData.items)
                     const itemsForTable = orderData.items.map(item => ({
                         lineItemID: item.lineItemID,
+                        name: item.name,
                         productID: item.productID,
                         quantity: item.quantity,
                         priceAtSale: item.priceAtSale
@@ -240,8 +201,6 @@ async function handleGetOrders() {
                     const actualTableContainerForItems = document.createElement('div');
                     actualTableContainerForItems.className = 'table-container';
                     itemsTableHostDiv.appendChild(actualTableContainerForItems);
-                    
-                    // Now append the host for the items table to the orderWrapperDiv (which is already in the DOM)
                     orderWrapperDiv.appendChild(itemsTableHostDiv);
 
                     createTable(uniqueItemsContainerId, itemsForTable);

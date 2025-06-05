@@ -168,19 +168,26 @@ function formatValue(value) {
     if (value === null || value === undefined || value === '') return '-';
     if ((typeof value === 'number' && Number.isInteger(value)) || (!isNaN(parseFloat(value)))) return value
 
-    const date = new Date(value);
-    if (!isNaN(date)) {
-        return date.toLocaleString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-        });
+    if (typeof value === 'string') {
+        const isoDatePattern = /^\d{4}-\d{2}-\d{2}/;
+        const timestampPattern = /^\d{10,13}$/;
+
+        if (isoDatePattern.test(value) || timestampPattern.test(value)) {
+            const date = new Date(value);
+            if (!isNaN(date.getTime())) {
+                return date.toLocaleString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                });
+            }
+        }
     }
 
-    return capitalize(String(value))
+    return capitalize(String(value));
 }
 
 async function setSelectOptions({ endpoint, elements, label = 'Select an option', key, errorMessage, requireAuth = false, idKey = "id", nameKey = "name"}) {
