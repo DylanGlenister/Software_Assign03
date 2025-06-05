@@ -7,100 +7,96 @@ from pydantic import EmailStr
 
 from ..core.database import Database, Role, Status
 from .account import Account
+from .trolley import Trolley
 
 
 class CustomerAccount(Account):
-	def __init__(self,
-		accountID: int,
-		creationDate: str,
-		role: Role,
-		status: Status,
-		email: str | None,
-		password: str | None,
-		firstname: str | None,
-		lastname: str | None,
-	):
-		super().__init__(
-			accountID,
-			creationDate,
-			role,
-			status,
-			email,
-			password,
-			firstname,
-			lastname
-		)
+    def __init__(
+        self,
+        accountID: int,
+        creationDate: str,
+        role: Role,
+        status: Status,
+        email: str | None,
+        password: str | None,
+        firstname: str | None,
+        lastname: str | None,
+        db: Database,
+    ):
+        self.trolley: Trolley = Trolley(db, accountID)
 
-	@classmethod
-	def register(cls, db: Database, email: EmailStr, password: str, role: Role):
-		"""Create a new account with hashed password."""
-		existing: dict | None = db.get_account(email=email)
-		if existing:
-			raise HTTPException(
-				status_code=httpStatus.HTTP_409_CONFLICT,
-				detail="An account with that email already exists."
-			)
+        super().__init__(
+            accountID,
+            creationDate,
+            role,
+            status,
+            email,
+            password,
+            firstname,
+            lastname)
 
-		if len(password) < 8:
-			raise HTTPException(
-				status_code=httpStatus.HTTP_422_UNPROCESSABLE_ENTITY,
-				detail="Password must be at least 8 characters long."
-			)
+    @classmethod
+    def register(
+            cls,
+            db: Database,
+            email: EmailStr,
+            password: str,
+            role: Role):
+        """Create a new account with hashed password."""
+        existing: dict | None = db.get_account(_email=email)
+        if existing:
+            raise HTTPException(
+                status_code=httpStatus.HTTP_409_CONFLICT,
+                detail="An account with that email already exists.",
+            )
 
-		if not any(char.isupper() for char in password):
-			raise HTTPException(
-				status_code=httpStatus.HTTP_422_UNPROCESSABLE_ENTITY,
-				detail="Password must contain at least one uppercase letter."
-			)
+        if len(password) < 8:
+            raise HTTPException(
+                status_code=httpStatus.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Password must be at least 8 characters long.",
+            )
 
-		hashed_password: str = cls._hash_password(password)
-		email = email.strip().lower()
-		creation_date: datetime = datetime.now()
+        if not any(char.isupper() for char in password):
+            raise HTTPException(
+                status_code=httpStatus.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Password must contain at least one uppercase letter.",
+            )
 
-		accountID: int = db.create_account(role, email, hashed_password, creationDate=creation_date)
-		if accountID is None:
-			raise HTTPException(
-				status_code=httpStatus.HTTP_500_INTERNAL_SERVER_ERROR,
-				detail="An unknown issue caused account creation to fail."
-			)
+        hashed_password: str = cls._hash_password(password)
+        email = email.strip().lower()
+        creation_date: datetime = datetime.now()
 
-		account_details = db.get_account(accountId=accountID)
-		assert(account_details)
+        accountID: int = db.create_account(
+            role, email, hashed_password, _creationDate=creation_date
+        )
+        if accountID is None:
+            raise HTTPException(
+                status_code=httpStatus.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unknown issue caused account creation to fail.",
+            )
 
-		return cls(**account_details)
+        account_details = db.get_account(_accountId=accountID)
+        assert account_details
 
-	@classmethod
-	def create_guest(cls, db: Database):
-		guest_email = f"guest_{uuid4().hex[:8]}@temp.domain"
+        return cls(db=db, **account_details)
 
-		accountID: int = db.create_account(Role.GUEST, guest_email, "")
-		if accountID is None:
-			raise HTTPException(
-				status_code=httpStatus.HTTP_500_INTERNAL_SERVER_ERROR,
-				detail="An unknown issue caused guest account creation to fail."
-			)
+    @classmethod
+    def create_guest(cls, db: Database):
+        guest_email = f"guest_{uuid4().hex[:8]}@temp.domain"
 
-		account_details = db.get_account(accountId=accountID)
-		assert(account_details)
+        accountID: int = db.create_account(Role.GUEST, guest_email, "")
+        if accountID is None:
+            raise HTTPException(
+                status_code=httpStatus.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="An unknown issue caused guest account creation to fail.",
+            )
 
-		return cls(**account_details)
+        account_details = db.get_account(_accountId=accountID)
+        assert account_details
 
-	def get_trolley(self, db: Database):
-		return db.get_trolley(self.accountID)
+        return cls(db=db, **account_details)
 
-	def add_to_trolley(self, db: Database, product_id: int, amount: int):
-		return db.add_to_trolley(self.accountID, product_id, amount)
+    def create_order(self, db: Database, addressID: int, order_manager):
+        orderID = db.create_order(self.accountID, addressID)
 
-	def remove_from_trolley(self, db: Database, product_id: int):
-		return db.remove_from_trolley(self.accountID, product_id)
-
-	def set_amount_in_trolley(self, db: Database, product_id: int, amount: int):
-		return db.change_quantity_of_product_in_trolley(self.accountID, product_id, amount)
-
-	def clear_trolly(self, db: Database):
-		return db.clear_trolley(self.accountID)
-
-	def create_order(self, db: Database, addressID: int, order_manager):
-		orderID = db.create_order(self.accountID, addressID)
-
-		#logic when order manager is done
+        # logic when order manager is done
