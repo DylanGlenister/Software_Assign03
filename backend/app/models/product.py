@@ -74,18 +74,6 @@ class Product:
         
         return cls(product_id, db)
     
-    @classmethod
-    def get_all_products(cls, db: Database) -> List["Product"]:
-        """get all existin products from database"""
-        product_ids = db.get_all_product_ids()
-        return [cls(product_id, db) for product_id in product_ids]
-    
-    @classmethod
-    def search_products(cls, db: Database, **search_criteria) -> List["Product"]:
-        """search products"""
-        #passes search parameters we provide directly to the database layer 
-        product_ids = db.search_products(**search_criteria)
-        return [cls(product_id, db) for product_id in product_ids]
 
     def refresh_from_db(self):
         """refresh product datato get latest updates"""
@@ -151,12 +139,23 @@ class Product:
     #take product fields that need to be updated and updates them  and save changes to the database
     #product.update_product(name="newname", price=10)
     def update_product(self, **kwargs) -> bool:
-        """update product attributes"""
-        # Update attributes directly
+        """update product attributes with validation"""
+        
+        # validation
         for field, value in kwargs.items():
-            if hasattr(self, field):
-                setattr(self, field, value)
-    
+            if not hasattr(self, field):
+                raise ValueError(f"invalid field: {field}") #checks updatre field
+            
+            if field == 'price' and value < 0:
+                raise ValueError("price cannot be negative") #check updaate price
+            
+            if field in ['stock', 'available_for_sale'] and value < 0: #available fdor sale cant be negartuve
+                raise ValueError(f"{field} cannot be negative")
+        
+        # Update attributes
+        for field, value in kwargs.items():
+            setattr(self, field, value)
+
         return self.save_to_db()
     
     
