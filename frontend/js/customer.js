@@ -23,6 +23,7 @@ function initCustomer() {
     })
 }
 
+
 async function handleRegister(e) {
     e.preventDefault();
     setFormLoading('registerForm', true);
@@ -108,7 +109,6 @@ function groupOrders(orderItems) {
     if (!orderItems || orderItems.length === 0) return {};
     const orders = {};
     orderItems.forEach(item => {
-        console.log(item)
         const { orderID, accountID, addressID, date, lineItemID, productID, quantity, priceAtSale, name, location } = item;
         if (!orders[orderID]) {
             orders[orderID] = {
@@ -185,7 +185,6 @@ async function handleGetOrders() {
 
 
                 if (orderData.items.length > 0) {
-                    console.log(orderData.items)
                     const itemsForTable = orderData.items.map(item => ({
                         lineItemID: item.lineItemID,
                         name: item.name,
@@ -277,8 +276,8 @@ async function handleAddAddress(e) {
     }
     setFormLoading('addAddressForm', true);
     const address = document.getElementById('addAddressValue').value;
-    const endpoint = `/customer/address/add?address=${encodeURIComponent(address)}`;
-    const response = await makeRequest(endpoint, 'GET', null, true);
+    const endpoint = `/customer/address/add`;
+    const response = await makeRequest(endpoint, 'POST', {"address": address}, true);
 
     if (response.ok) {
         showNotification('Address added successfully!', 'success');
@@ -303,8 +302,8 @@ async function handleRemoveAddress(e) {
     }
     setFormLoading('removeAddressForm', true);
     const addressId = parseInt(document.getElementById('removeAddressIdValue').value);
-    const endpoint = `/customer/address/remove?address_id=${addressId}`;
-    const response = await makeRequest(endpoint, 'GET', null, true);
+    const endpoint = `/customer/address/remove`;
+    const response = await makeRequest(endpoint, 'DELETE', {"address_id": addressId}, true);
 
     if (response.ok) {
         showNotification('Address removed successfully!', 'success');

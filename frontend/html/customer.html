@@ -163,7 +163,7 @@
             <span>/customer/trolley/remove</span>
             <p class="endpoint-description">
                 <strong>CREATES A GUEST ACCOUNT IF NOT LOGGED IN</strong><br>
-                Removes the selected product from the trolley. <br> <!-- Simplified description -->
+                Removes the selected product from the trolley. <br>
             </p>
         </div>
         <div class="endpoint-body">
@@ -265,11 +265,10 @@
     <!-- Add Address -->
     <div class="endpoint-card">
         <div class="endpoint-header">
-            <span class="method-badge method-get">GET</span> <!-- As per Python route -->
+            <span class="method-badge method-post">POST</span>
             <span>/customer/address/add</span>
             <p class="endpoint-description">
                 Adds an address for the current logged-in customer. Requires authentication. <br>
-                <em>Note: Uses GET with a query parameter as per provided route.</em>
             </p>
         </div>
         <div class="endpoint-body">
@@ -293,11 +292,10 @@
     <!-- Remove Address -->
     <div class="endpoint-card">
         <div class="endpoint-header">
-            <span class="method-badge method-get">GET</span> <!-- As per Python route -->
+            <span class="method-badge method-delete">Delete</span>
             <span>/customer/address/remove</span>
             <p class="endpoint-description">
                 Removes an address by ID for the current logged-in customer. Requires authentication. <br>
-                <em>Note: Uses GET with a query parameter as per provided route.</em>
             </p>
         </div>
         <div class="endpoint-body">
