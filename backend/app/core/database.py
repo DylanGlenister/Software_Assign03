@@ -1042,11 +1042,9 @@ class Database:
                 A list of dictionaries, each representing a line item in the trolley. Empty list if none. Returns None on error.
         """
         query = """
-			SELECT li.lineItemID, li.productID, p.name as productName,
-				   li.quantity, li.priceAtSale, p.price as currentPrice
+			SELECT li.lineItemID, li.productID, li.quantity
 			FROM Trolley t
 			JOIN LineItem li ON t.lineItemID = li.lineItemID
-			JOIN Product p ON li.productID = p.productID
 			WHERE t.accountID = %s
 		"""
         return self._fetch_all(query, (accountID,))
@@ -1372,9 +1370,12 @@ class Database:
                 A dictionary containing order data, or None if not found or error.
         """
         query = """
-			SELECT orderID, accountID, addressID, date
-			FROM Order
-			WHERE orderID = %s
+			SELECT o.orderID o.accountID, o.addressID,
+                   li.lineItemID, li.productID, li.quantity,
+                   li.priceAtSale
+			FROM Order o
+			JOIN LineItem li ON t.lineItemID = li.lineItemID
+			WHERE o.orderID = %s
 		"""
         return self._fetch_one(query, (orderID,))
 
@@ -1391,7 +1392,7 @@ class Database:
 		"""
         return self._fetch_all(query, ())
 
-    def get_order_from_accounts(
+    def get_orders_from_account(
             self, accountID: ID, /) -> list[DictRow] | None:
         """
         Retrieves all orders made by an account.

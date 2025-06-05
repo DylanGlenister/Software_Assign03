@@ -20,10 +20,10 @@ class orderManager:
 
     def save_receipt(self, orderId):
         result = self.db.save_receipt(self.accountId, orderId)
-        return result 
-    
+        return result
+
     def get_order(self, orderId):
-        orders = self.db.get_order_from_accounts(self.accountId)
+        orders = self.db.get_orders_from_account(self.accountId)
         for order in orders:
                 if orders["orderId"] == orderId:
                     return order
