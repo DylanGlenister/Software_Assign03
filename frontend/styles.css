@@ -116,7 +116,7 @@ body {
     background: #f8f9fa;
     padding: 15px 20px;
     border-bottom: 1px solid #e1e8ed;
-    flex-wrap: wrap; 
+    flex-wrap: wrap;
 }
 
 .endpoint-path-container {
@@ -124,7 +124,7 @@ body {
     align-items: center;
     gap: 10px;
     width: 100%;
-    margin-bottom: 8px; 
+    margin-bottom: 8px;
 }
 
 .endpoint-description {
@@ -138,7 +138,7 @@ body {
 }
 
 .endpoint-header .endpoint-description {
-    flex-basis: 100%; 
+    flex-basis: 100%;
     margin-left: 0;
 }
 
@@ -157,6 +157,7 @@ body {
 .method-delete { background: #dc3545; color: white; }
 
 .endpoint-body {
+    margin: 3px 20px 3px 20px;
     padding: 20px;
 }
 
@@ -319,10 +320,10 @@ body {
 }
 
 .health-status-box .text-success { color: #155724; }
-.health-status-box .text-danger { color: #721c24; } 
-.health-status-box .text-warning { color: #856404; } 
+.health-status-box .text-danger { color: #721c24; }
+.health-status-box .text-warning { color: #856404; }
 
-.btn-sm { 
+.btn-sm {
     padding: .25rem .5rem;
     font-size: .875rem;
     line-height: 1.5;

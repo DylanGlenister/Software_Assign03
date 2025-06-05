@@ -1,7 +1,7 @@
 <div id="customer" class="content-section">
     <div class="section-header">
         <h3>Customer Routes</h3>
-        <p>Customer registration and shopping cart management</p>
+        <p>Customer registration and shopping Trolley management</p>
     </div>
 
     <!-- Register -->
@@ -18,7 +18,7 @@
                 <h4>Sample Data</h4>
                 <button id="fillRegisterDataBtn" class="btn btn-secondary">Fill Sample Data</button>
             </div>
-            
+
             <form id="registerForm">
                 <div class="form-group">
                     <label for="registerEmail">Email</label>
@@ -35,7 +35,7 @@
                 <details open>
                     <summary><strong>Raw JSON Response</strong></summary><br>
                     <div class="response-content"></div>
-                </details> 
+                </details>
             </div>
         </div>
     </div>
@@ -51,7 +51,7 @@
             </p>
         </div>
         <div class="endpoint-body">
-            <button id="getTrolleyBtn" class="btn btn-primary">Get Shopping Cart</button>
+            <button id="getTrolleyBtn" class="btn btn-primary">Get Shopping Trolley</button>
             <div id="getTrolleyResponse" class="response-container" style="display: none;">
                 <br><h3>Response:</h3><br>
                 <details open>
@@ -61,7 +61,7 @@
                 <details open>
                     <summary><strong>Raw JSON Response</strong></summary><br>
                     <div class="response-content"></div>
-                </details> 
+                </details>
             </div>
         </div>
     </div>
@@ -77,14 +77,14 @@
             </p>
         </div>
         <div class="endpoint-body">
-            <p>Clear all items from the shopping cart.</p>
-            <button id="clearTrolleyBtn" class="btn btn-primary">Clear Cart</button>
+            <p>Clear all items from the shopping Trolley.</p>
+            <button id="clearTrolleyBtn" class="btn btn-primary">Clear Trolley</button>
             <div id="clearTrolleyResponse" class="response-container" style="display: none;">
                 <br><h3>Response:</h3><br>
                 <details open>
                     <summary><strong>Raw JSON Response</strong></summary><br>
                     <div class="response-content"></div>
-                </details> 
+                </details>
             </div>
         </div>
     </div>
@@ -100,7 +100,7 @@
             </p>
         </div>
         <div class="endpoint-body">
-          
+
             <form id="addToTrolleyForm">
                 <div class="form-group">
                     <label for="addProductId">Product ID</label>
@@ -112,14 +112,46 @@
                     <label for="addAmount">Amount</label>
                     <input type="number" id="addAmount" class="form-control" value="1" min="1" required>
                 </div>
-                <button type="submit" class="btn btn-primary">Add to Cart</button>
+                <button type="submit" class="btn btn-primary">Add to Trolley</button>
             </form>
             <div id="addToTrolleyResponse" class="response-container" style="display: none;">
                 <br><h3>Response:</h3><br>
                 <details open>
                     <summary><strong>Raw JSON Response</strong></summary><br>
                     <div class="response-content"></div>
-                </details> 
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modify item quanity in Trolley -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">POST</span>
+            <span>/customer/trolley/modify</span>
+            <p class="endpoint-description">
+                <strong>CREATES A GUEST ACCOUNT IF NOT LOGGED IN</strong><br>
+                Sets the amount of the selected product to the trolley. If value set is zero, then the item is removed from the trolley. <br>
+            </p>
+        </div>
+        <div class="endpoint-body">
+            <form id="modifyItemInTrolleyForm">
+                <div class="form-group">
+                    <label for="modifyProductId">Product ID</label>
+                    <input type="number" id="modifyProductId" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="modifyAmount">Amount</label>
+                    <input type="number" id="modifyAmount" class="form-control" value="1" min="0" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Modify quantity in Trolley</button>
+            </form>
+            <div id="modifyItemInTrolleyResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open>
+                    <summary><strong>Raw JSON Response</strong></summary><br>
+                    <div class="response-content"></div>
+                </details>
             </div>
         </div>
     </div>
@@ -140,18 +172,14 @@
                     <label for="removeProductId">Product ID</label>
                     <input type="number" id="removeProductId" class="form-control" required>
                 </div>
-                <div class="form-group">
-                    <label for="removeAmount">Amount</label>
-                    <input type="number" id="removeAmount" class="form-control" value="1" min="1" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Remove from Cart</button>
+                <button type="submit" class="btn btn-primary">Remove from Trolley</button>
             </form>
             <div id="removeFromTrolleyResponse" class="response-container" style="display: none;">
                 <br><h3>Response:</h3><br>
                 <details open>
                     <summary><strong>Raw JSON Response</strong></summary><br>
                     <div class="response-content"></div>
-                </details> 
+                </details>
             </div>
         </div>
     </div>
