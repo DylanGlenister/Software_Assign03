@@ -8,22 +8,22 @@ from fastapi import HTTPException, status
 from ..utils.fields import filter_dict
 from ..utils.settings import SETTINGS
 
-# def filter_dict(data: dict, valid_keys: set, /, *, log_invalid: bool = True) -> dict:
-# filtered = {k: v for k, v in data.items() if k in valid_keys}
-# if log_invalid:
-# invalid = set(data.keys()) - valid_keys
-# for key in invalid:
-# print(f"Ignored invalid field: {key}")
-# return filtered
+#def filter_dict(data: dict, valid_keys: set, /, *, log_invalid: bool = True) -> dict:
+#    filtered = {k: v for k, v in data.items() if k in valid_keys}
+#    if log_invalid:
+#        invalid = set(data.keys()) - valid_keys
+#        for key in invalid:
+#            print(f"Ignored invalid field: {key}")
+#    return filtered
 
-# class MockSettings:
-# database_username: str = 'admin'
-# database_password: str = 'password'
-# database_host: str = 'localhost'
-# database_port: int = 3306
-# database: str = 'awe_electronics'
+#class MockSettings:
+#    database_username: str = 'admin'
+#    database_password: str = 'password'
+#    database_host: str = 'localhost'
+#    database_port: int = 3306
+#    database: str = 'awe_electronics'
 
-# SETTINGS = MockSettings()
+#SETTINGS = MockSettings()
 
 # Type aliases
 DictRow: TypeAlias = dict[str, Any]
