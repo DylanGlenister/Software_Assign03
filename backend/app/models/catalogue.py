@@ -7,6 +7,7 @@ class Catalogue:
     Simple catalogue class for displaying, searching, filtering and sorting products.
     """
 
+
     def __init__(self, db: Database):
         """Initialize catalogue with database connection."""
         self.db = db

@@ -10,6 +10,7 @@ from .settings import SETTINGS
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+
 class TokenData(BaseModel):
     accountID: int
     email: str
@@ -17,17 +18,27 @@ class TokenData(BaseModel):
     status: Status
     exp: Optional[int] = None
 
-def create_token( data: dict, expires_in: int = SETTINGS.access_token_expire_minutes,
-                 secret_key: str = SETTINGS.secret_key, algorithm: str = SETTINGS.algorithm) -> str:
+
+def create_token(
+    data: dict,
+    expires_in: int = SETTINGS.access_token_expire_minutes,
+    secret_key: str = SETTINGS.secret_key,
+    algorithm: str = SETTINGS.algorithm,
+) -> str:
     """Create a JWT token with the given data and expiration."""
     payload = data.copy()
     expire_time = datetime.now(timezone.utc) + timedelta(minutes=expires_in)
     payload["exp"] = int(expire_time.timestamp())
 
     encoded = jwt.encode(payload, secret_key, algorithm=algorithm)
-    return encoded if isinstance(encoded, str) else encoded.decode('utf-8')
+    return encoded if isinstance(encoded, str) else encoded.decode("utf-8")
 
-def decode_token(token: str, secret_key: str = SETTINGS.secret_key, algorithm: str = SETTINGS.algorithm) -> Optional[TokenData]:
+
+def decode_token(
+    token: str,
+    secret_key: str = SETTINGS.secret_key,
+    algorithm: str = SETTINGS.algorithm,
+) -> Optional[TokenData]:
     """Decode and validate a JWT token."""
     try:
         payload = jwt.decode(token, secret_key, algorithms=[algorithm])
@@ -35,7 +46,10 @@ def decode_token(token: str, secret_key: str = SETTINGS.secret_key, algorithm: s
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
         return None
 
-def get_token(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> Optional[str]:
+
+def get_token(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> Optional[str]:
     """
     Gets the JWT token from the authorization headers.
     """
@@ -43,19 +57,25 @@ def get_token(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)
         return credentials.credentials
     return None
 
-def get_secure_token(credentials: HTTPAuthorizationCredentials = Depends(get_token)) -> str:
+
+def get_secure_token(
+    credentials: HTTPAuthorizationCredentials = Depends(get_token),
+) -> str:
     """
     Gets the JWT token from the authorization headers, throwing an error if its missing.
     """
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header required"
+            detail="Authorization header required",
         )
 
     return credentials
 
-def get_account_data(token: str = Depends(get_secure_token), db: Database = Depends(get_db)) -> dict:
+
+def get_account_data(
+    token: str = Depends(get_secure_token), db: Database = Depends(get_db)
+) -> dict:
     """
     Validate token and get full account details from database.
     """
@@ -63,14 +83,12 @@ def get_account_data(token: str = Depends(get_secure_token), db: Database = Depe
     if not token_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
-        )
+            detail="Invalid or expired token")
 
     account_data = db.get_account(accountId=token_data.accountID)
     if not account_data:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Account not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
         )
 
     return account_data
