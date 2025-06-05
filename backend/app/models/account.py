@@ -1,5 +1,6 @@
 import re
 from typing import Optional, Type
+import datetime
 
 from bcrypt import checkpw, gensalt, hashpw
 from pydantic import EmailStr, ValidationError
@@ -10,12 +11,12 @@ from ..utils.fields import filter_dict
 
 class Account:
 	def __init__(self, accountID, email, password, firstname, lastname, creationDate, role: Role, status: Status):
-		self.accountID = accountID
-		self.email = email
-		self.password = password
-		self.firstname = firstname
-		self.lastname = lastname
-		self.creationDate = creationDate
+		self.accountID: int = accountID
+		self.email: EmailStr = email
+		self.password: str = password
+		self.firstname: str = firstname
+		self.lastname: str = lastname
+		self.creationDate: datetime = creationDate
 		self.role: Role = role
 		self.status: Status = status
 

@@ -184,30 +184,3 @@ class AdminAccount(Account):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Account retrieval failed: {str(e)}")
-
-    def delete_old_accounts_by_role(
-            self,
-            db: Database,
-            days: int,
-            role: Role) -> str:
-        """Bulk delete accounts older than specified days by role.
-        
-        Args:
-            db: Database connection instance
-            days: Minimum age in days for deletion
-            role: Target role to filter accounts
-            
-        Returns:
-            Success message string
-            
-        Raises:
-            HTTPException: 500 if deletion fails
-        """
-        cutoff_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
-        
-        if not db.delete_old_accounts_by_role(role=role, before_date=cutoff_date):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to delete old {role.value} accounts")
-                
-        return f"Removed {role.value} accounts older than {days} days"
