@@ -989,7 +989,7 @@ class Database:
 		'''
 		return self._fetch_all(query, (_accountId,))
 
-	def add_to_trolley(self, _accountId: Id, _productId: Id, /, *, _quantity: int = 1) -> Id:
+	def add_to_trolley(self, _accountId: Id, _productId: Id, /, _quantity: int = 1) -> Id:
 		"""
 		Adds a product to an account's trolley. This is an atomic operation.
 
