@@ -10,11 +10,29 @@ from .account import Account
 
 
 class CustomerAccount(Account):
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
+	def __init__(self,
+		accountID: int,
+		creationDate: str,
+		role: Role,
+		status: Status,
+		email: str | None,
+		password: str | None,
+		firstname: str | None,
+		lastname: str | None,
+	):
+		super().__init__(
+			accountID,
+			creationDate,
+			role,
+			status,
+			email,
+			password,
+			firstname,
+			lastname
+		)
 
 	@classmethod
-	def register(cls, db: Database, email: EmailStr, password: str, role: Role, status: Status) -> dict:
+	def register(cls, db: Database, email: EmailStr, password: str, role: Role):
 		"""Create a new account with hashed password."""
 		existing: dict | None = db.get_account(_email=email)
 		if existing:
@@ -46,21 +64,26 @@ class CustomerAccount(Account):
 				detail="An unknown issue caused account creation to fail."
 			)
 
-		return {"account": cls(accountID, email, hashed_password, creation_date.strftime("%Y-%m-%d %H:%M:%S"), role=role, status=status)}
+		account_details = db.get_account(_accountId=accountID)
+		assert(account_details)
+
+		return cls(**account_details)
 
 	@classmethod
-	def create_guest(cls, db: Database) -> dict:
+	def create_guest(cls, db: Database):
 		guest_email = f"guest_{uuid4().hex[:8]}@temp.domain"
-		creation_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-		accountID: int = db.create_account()
+		accountID: int = db.create_account(Role.GUEST, guest_email, "")
 		if accountID is None:
 			raise HTTPException(
 				status_code=httpStatus.HTTP_500_INTERNAL_SERVER_ERROR,
 				detail="An unknown issue caused guest account creation to fail."
 			)
 
-		return {"account": cls(accountID, guest_email, "", creation_date, role=Role.GUEST, status=Status.ACTIVE)}
+		account_details = db.get_account(_accountId=accountID)
+		assert(account_details)
+
+		return cls(**account_details)
 
 	def get_trolley(self, db: Database):
 		return db.get_trolley(self.accountID)

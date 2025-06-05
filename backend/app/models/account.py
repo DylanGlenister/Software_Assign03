@@ -9,15 +9,24 @@ from ..utils.fields import filter_dict
 
 
 class Account:
-	def __init__(self, accountID, email, password, firstname, lastname, creationDate, role: Role, status: Status):
-		self.accountID = accountID
-		self.email = email
-		self.password = password
-		self.firstname = firstname
-		self.lastname = lastname
-		self.creationDate = creationDate
+	def __init__(self,
+		accountID: int,
+		creationDate : str,
+		role: Role,
+		status: Status,
+		email: str | None,
+		password: str | None,
+		firstname: str | None,
+		lastname : str | None
+	):
+		self.accountID: int = accountID
+		self.creationDate: str = creationDate
 		self.role: Role = role
 		self.status: Status = status
+		self.email: str | None = email
+		self.password: str | None = password
+		self.firstname: str | None = firstname
+		self.lastname: str | None = lastname
 
 	@classmethod
 	def _hash_password(cls, password: str) -> str:
