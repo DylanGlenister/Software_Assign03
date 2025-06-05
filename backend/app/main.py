@@ -10,6 +10,7 @@ from app.core.account_route import account_route
 from app.core.customer_route import customer_route
 from app.core.admin_route import admin_route
 from app.core.utility_route import utility_route
+from app.core.catalogue_route import catalogue_route
 
 # === SETUP ===
 
@@ -57,6 +58,7 @@ app.include_router(account_route)
 app.include_router(customer_route)
 app.include_router(admin_route)
 app.include_router(utility_route)
+app.include_router(catalogue_route)
 
 
 @app.get("/")
