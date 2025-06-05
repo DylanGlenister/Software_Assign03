@@ -105,7 +105,7 @@ def token_info(token: str = Depends(get_token)):
 # TEMP ROUTE UNTILL IMPEMENTED
 @utility_route.get("/getProducts")
 def get_products(db: Database = Depends(get_db)):
-    products = db.get_products()
+    products = db.get_all_products()
     return {"products": products}
 
 

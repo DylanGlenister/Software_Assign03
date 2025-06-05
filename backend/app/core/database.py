@@ -744,74 +744,57 @@ class Database:
             return None  # Error case from _fetch_all
         return [row["url"] for row in result]
 
-    def get_products(self, tags: list[str] |
-                     None = None, /) -> list[DictRow] | None:
+    def get_all_products(self) -> list[DictRow] | None:
         """
-        Retrieves products. If tags are provided, retrieves products matching ALL specified tags.
-        If no tags are provided, retrieves all products.
-
-        Args:
-                tags: A list of tag names to filter by.
+        Retrieves all products from the database.
 
         Returns:
-                A list of dictionaries, each representing a product. Returns empty list if none. Returns None on error.
+            A list of dictionaries, each representing a product. Returns None on a database error.
+        """
+        query = "SELECT * FROM Product"
+        return self._fetch_all(query)
+
+    def get_products_by_tags(self, tags: list[str], /) -> list[DictRow] | None:
+        """
+        Retrieves products that are associated with ALL of the specified tags.
+
+        Args:
+            tags: A list of tag names to filter by.
+
+        Returns:
+            A list of dictionaries for products matching all tags. Returns an
+            empty list if no tags are provided or no products match.
+            Returns None on a database error.
         """
         if not tags:
-            query = """
-				SELECT productID, name, description, price, stock, available, creationDate, discontinued
-				FROM Product
-			"""
-            params = ()
-        else:
-            num_tags = len(tags)
-            placeholders = ", ".join(["%s"] * num_tags)
-            query = f"""
-				SELECT p.productID, p.name, p.description, p.price,
-					   p.stock, p.available, p.creationDate, p.discontinued
-				FROM Product p
-				JOIN `Product-Tag` pt ON p.productID = pt.productID
-				JOIN `Tag` t ON pt.tagID = t.tagID
-				WHERE t.name IN ({placeholders})
-				GROUP BY p.productID
-				HAVING COUNT(DISTINCT t.tagID) = %s
-			"""
-            params = tuple(tags) + (num_tags,)
-        return self._fetch_all(query, params)
+            return []
 
-    def get_products_with_tagIDs(
-        self, tagIds: set[ID] | None = None, /
-    ) -> list[DictRow] | None:
+        num_tags = len(tags)
+        placeholders = ", ".join(["%s"] * num_tags)
+
+        # This query finds products that have a tag in the provided list,
+        # then the HAVING clause filters those results to only include products
+        # where the count of distinct matching tags is equal to the number of
+        # tags we searched for. This ensures an AND condition.
+        query = f"""
+            SELECT
+                p.productID, p.name, p.description, p.price,
+                p.stock, p.available, p.creationDate, p.discontinued,
+                GROUP_CONCAT(DISTINCT t.name SEPARATOR ',') AS tags
+            FROM
+                Product p
+            JOIN `Product-Tag` pt ON p.productID = pt.productID
+            JOIN `Tag` t ON pt.tagID = t.tagID
+            WHERE
+                t.name IN ({placeholders})
+            GROUP BY
+                p.productID
+            HAVING
+                COUNT(DISTINCT t.name) = %s
+            ORDER BY
+                p.productID ASC
         """
-        Retrieves products. If tag IDs are provided, retrieves products matching ALL specified tag IDs.
-        If no tag IDs are provided (None or empty set), retrieves all products.
-
-        Args:
-                tagIDs: A set of tag IDs to filter by. Can be None or empty to get all products.
-
-        Returns:
-                A list of dictionaries, each representing a product. Returns empty list if no products match.
-                Returns None if a database error occurs.
-        """
-        if not tagIds:
-            query = """
-				SELECT productID, name, description, price, stock, available, creationDate, discontinued
-				FROM Product
-			"""
-            params = ()
-        else:
-            num_tags = len(tagIds)
-            placeholders = ", ".join(["%s"] * num_tags)
-            query = f"""
-				SELECT p.productID, p.name, p.description, p.price,
-						p.stock, p.available, p.creationDate, p.discontinued
-				FROM Product p
-				JOIN `Product-Tag` pt ON p.productID = pt.productID
-				WHERE pt.tagID IN ({placeholders})
-				GROUP BY p.productID, p.name, p.description, p.price, p.stock, p.available, p.creationDate, p.discontinued
-				HAVING COUNT(DISTINCT pt.tagID) = %s
-			"""
-            params = tuple(tagIds) + (num_tags,)
-
+        params = tuple(tags) + (num_tags,)
         return self._fetch_all(query, params)
 
     # --- Tag Management ---
@@ -960,6 +943,26 @@ class Database:
             if not isinstance(e, ValueError):
                 self.rollback()
             raise
+
+    def get_tags_for_product(self, productID: ID) -> list[DictRow] | None:
+        """
+        Retrieves all tags associated with a specific product.
+
+        Args:
+            productID: The ID of the product to be accessed.
+
+        Returns:
+            A list of dictionaries, each containing a tag's name.
+            Returns an empty list if the product has no tags.
+            Returns None on a database error.
+        """
+        query = """
+            SELECT t.name
+            FROM `Tag` t
+            JOIN `Product-Tag` pt ON t.tagID = pt.tagID
+            WHERE pt.productID = %s
+        """
+        return self._fetch_all(query, (productID,))
 
     # --- Image Management ---
 
@@ -1370,9 +1373,9 @@ class Database:
                 A dictionary containing order data, or None if not found or error.
         """
         query = """
-            SELECT 
-                o.orderID, o.accountID,o.addressID, o.date, 
-                a.location, li.lineItemID, li.productID, 
+            SELECT
+                o.orderID, o.accountID,o.addressID, o.date,
+                a.location, li.lineItemID, li.productID,
                 li.quantity, li.priceAtSale, li.name
             FROM `Order` o
             JOIN OrderItem oi ON o.orderID = oi.orderID
@@ -1407,9 +1410,9 @@ class Database:
                 A list containing all the orders. Returns empty list if none. Returns None on error.
         """
         query = """
-            SELECT 
-                o.orderID, o.accountID,o.addressID, o.date, 
-                addr.location, li.lineItemID, li.productID, 
+            SELECT
+                o.orderID, o.accountID,o.addressID, o.date,
+                addr.location, li.lineItemID, li.productID,
                 li.quantity, li.priceAtSale, p.name
             FROM `Order` o
             JOIN `Account` a ON o.accountID = a.accountID
@@ -1796,7 +1799,7 @@ class DatabaseTests:
             not_disc_prod is not None and not_disc_prod["discontinued"] == 0
         ), "set_product_discontinued failed (False)"
         # Get all products (basic check)
-        all_prods = db.get_products()
+        all_prods = db.get_all_products()
         assert all_prods is not None and any(
             p["productID"] == prod_id for p in all_prods
         ), "Failed to get all products or find test product"
@@ -1831,23 +1834,6 @@ class DatabaseTests:
             "Desc")
         db.add_tag_to_product(prod_id, tag1_id)
         db.add_tag_to_product(prod_id, tag2_id)
-        # Verify link with get_products and get_products_with_tagIDs
-        prods_by_name = db.get_products([tag_name1, tag_name2])
-        assert prods_by_name is not None and any(
-            p["productID"] == prod_id for p in prods_by_name
-        ), "get_products by name failed"
-        prods_by_id = db.get_products_with_tagIDs({tag1_id, tag2_id})
-        assert prods_by_id is not None and any(
-            p["productID"] == prod_id for p in prods_by_id
-        ), "get_products_with_tagIDs failed"
-        # Remove link
-        db.remove_tag_from_product(prod_id, tag1_id)
-        prods_after_remove = db.get_products_with_tagIDs(
-            {tag1_id, tag2_id}
-        )  # Should not find it now
-        assert not any(
-            p["productID"] == prod_id for p in prods_after_remove or []
-        ), "Product still found after removing one of required tags"
         try:
             db.remove_tag_from_product(prod_id, tag1_id)  # Try removing again
             assert (
