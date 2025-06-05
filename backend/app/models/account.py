@@ -38,7 +38,7 @@ class Account:
 	@classmethod
 	def login(cls: Type["Account"], db: Database, email: EmailStr, password: str) -> Optional["Account"]:
 		"""Attempt to find an account with matching email and password."""
-		account: dict | None = db.get_account(_email=email)
+		account: dict | None = db.get_account(email=email)
 		if not account:
 			print("No account found with that email.")
 			return None

@@ -34,7 +34,7 @@ class CustomerAccount(Account):
 	@classmethod
 	def register(cls, db: Database, email: EmailStr, password: str, role: Role):
 		"""Create a new account with hashed password."""
-		existing: dict | None = db.get_account(_email=email)
+		existing: dict | None = db.get_account(email=email)
 		if existing:
 			raise HTTPException(
 				status_code=httpStatus.HTTP_409_CONFLICT,
@@ -57,14 +57,14 @@ class CustomerAccount(Account):
 		email = email.strip().lower()
 		creation_date: datetime = datetime.now()
 
-		accountID: int = db.create_account(role, email, hashed_password, _creationDate=creation_date)
+		accountID: int = db.create_account(role, email, hashed_password, creationDate=creation_date)
 		if accountID is None:
 			raise HTTPException(
 				status_code=httpStatus.HTTP_500_INTERNAL_SERVER_ERROR,
 				detail="An unknown issue caused account creation to fail."
 			)
 
-		account_details = db.get_account(_accountId=accountID)
+		account_details = db.get_account(accountId=accountID)
 		assert(account_details)
 
 		return cls(**account_details)
@@ -80,7 +80,7 @@ class CustomerAccount(Account):
 				detail="An unknown issue caused guest account creation to fail."
 			)
 
-		account_details = db.get_account(_accountId=accountID)
+		account_details = db.get_account(accountId=accountID)
 		assert(account_details)
 
 		return cls(**account_details)

@@ -66,7 +66,7 @@ def get_account_data(token: str = Depends(get_secure_token), db: Database = Depe
             detail="Invalid or expired token"
         )
 
-    account_data = db.get_account(_accountId=token_data.accountID)
+    account_data = db.get_account(accountId=token_data.accountID)
     if not account_data:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
