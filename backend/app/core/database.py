@@ -1373,7 +1373,7 @@ class Database:
 			SELECT o.orderID o.accountID, o.addressID,
                    li.lineItemID, li.productID, li.quantity,
                    li.priceAtSale
-			FROM Order o
+			FROM `Order` o
 			JOIN LineItem li ON t.lineItemID = li.lineItemID
 			WHERE o.orderID = %s
 		"""
@@ -1388,7 +1388,7 @@ class Database:
         """
         query = """
 			SELECT orderID, accountID, addressID, date
-			FROM Order
+			FROM `Order`
 		"""
         return self._fetch_all(query, ())
 
@@ -1404,10 +1404,14 @@ class Database:
                 A list containing all the orders. Returns empty list if none. Returns None on error.
         """
         query = """
-			SELECT o.orderID, o.accountID, o.addressID, o.date
-			FROM Order o
-			JOIN `Account` a ON o.accountID = a.accountID
-			WHERE o.accountID = %s
+            SELECT 
+                o.orderID, o.accountID, o.addressID, o.date,
+                li.lineItemID, li.productID, li.quantity, li.priceAtSale
+            FROM `Order` o
+            JOIN `Account` a ON o.accountID = a.accountID
+            JOIN OrderItem oi ON o.orderID = oi.orderID
+            JOIN LineItem li ON oi.lineItemID = li.lineItemID
+            WHERE o.accountID = %s
 		"""
         return self._fetch_all(query, (accountID,))
 

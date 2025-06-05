@@ -105,7 +105,6 @@ function createTable(elementId, items) {
 }
 
 
-
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
@@ -167,7 +166,7 @@ function formatHeader(header) {
 
 function formatValue(value) {
     if (value === null || value === undefined || value === '') return '-';
-    if (typeof value === 'number' && Number.isInteger(value)) return value
+    if ((typeof value === 'number' && Number.isInteger(value)) || (!isNaN(parseFloat(value)))) return value
 
     const date = new Date(value);
     if (!isNaN(date)) {

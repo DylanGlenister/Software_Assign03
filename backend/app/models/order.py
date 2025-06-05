@@ -2,16 +2,17 @@ from ..core.database import Database
 from .trolley import Trolley
 
 
-class orderManager:
-    def __init__(self, accountId: int, addressId, db: Database, trolley: list):
+class OrderManager:
+    def __init__(self, accountId: int, addressId:int, db: Database):
         self.accountId: int = accountId
         self.addressId: int = addressId
-        self.trolley: list = trolley
+        self.trolley: Trolley = Trolley(db, accountId)
+        self.orders: list = []
         self.db: Database = db
 
-    def createorder(self):
+    def create_order(self) -> int:
         orderId = self.db.create_order(
-            self.accountId, self.addressId, self.trolley)
+            self.accountId, self.addressId)
         return orderId
 
     def save_invoice(self, orderId):
@@ -22,9 +23,6 @@ class orderManager:
         result = self.db.save_receipt(self.accountId, orderId)
         return result
 
-    def get_order(self, orderId):
-        orders = self.db.get_orders_from_account(self.accountId)
-        for order in orders:
-                if orders["orderId"] == orderId:
-                    return order
-        return False
+    def get_orders(self):
+        self.orders = self.db.get_orders_from_account(self.accountId)
+        return self.orders
