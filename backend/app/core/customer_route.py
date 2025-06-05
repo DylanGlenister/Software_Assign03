@@ -39,7 +39,13 @@ def register_route(
 	payload: RegisterPayload,
 	db: Database = Depends(get_db)
 ):
-	account: CustomerAccount = CustomerAccount.register(db, payload.email, payload.password, Role.CUSTOMER)
+	account: CustomerAccount = CustomerAccount.register(
+		db,
+		payload.email,
+		payload.password,
+		Role.CUSTOMER
+	)
+
 	if not account:
 		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Registration failed due to an unknown error.")
 
@@ -63,7 +69,6 @@ def get_trolly_route(
 	result["trolley"] = customer.get_trolley(db)
 	return result
 
-
 @customer_route.post("/trolley/add")
 def add_to_trolly_route(item: TrollyItem, db: Database = Depends(get_db), customer_data: dict = Depends(get_customer_account)):
 	customer: CustomerAccount | str | None = customer_data.get("account")
@@ -80,7 +85,22 @@ def add_to_trolly_route(item: TrollyItem, db: Database = Depends(get_db), custom
 		result["error"] = "Failed to add item to the trolley"
 	return result
 
-# TODO This is outdated
+@customer_route.post("/trolley/modify")
+def modify_number_in_trolley(item: TrollyItem, db: Database = Depends(get_db), customer_data: dict = Depends(get_customer_account)):
+	customer: CustomerAccount | str | None = customer_data.get("account")
+
+	if not isinstance(customer, CustomerAccount):
+		raise ValueError('Unknown error retrieving customer data')
+
+	result: dict = {"token": customer_data.get("token")}
+
+	success: bool = bool(customer.set_amount_in_trolley(db, item.product_id, item.amount))
+	if success:
+		result["message"] = "Item quantity has been modified in the trolley"
+	else:
+		result["error"] = "Failed to modify item quantity from the trolley"
+	return result
+
 @customer_route.post("/trolley/remove")
 def remove_from_trolly_route(item: TrollyItem, db: Database = Depends(get_db), customer_data: dict = Depends(get_customer_account)):
 	customer: CustomerAccount | str | None = customer_data.get("account")
