@@ -23,7 +23,7 @@ def get_customer_account(token: Optional[str] = Depends(get_token), db: Database
         "status": guest_account.status
     }
     token = create_token(token_data, 60)
-    return {"account": guest_account, "token": token}  
+    return {"account": guest_account, "token": token}
 
 class RegisterPayload(BaseModel):
 	email: EmailStr = "customer@example.com"
@@ -38,11 +38,11 @@ def register_route(payload: RegisterPayload, db: Database = Depends(get_db)):
 	account: dict = CustomerAccount.register(db, payload.email, payload.password)
 	if not account:
 		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Registration failed due to an unknown error.")
-	
+
 	error: str = account.get("error")
 	if error:
 		raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error)
-	
+
 	account: CustomerAccount =  account.get("account")
 
 	return {
@@ -54,8 +54,8 @@ def register_route(payload: RegisterPayload, db: Database = Depends(get_db)):
 def get_trolly_route(db: Database = Depends(get_db), customer_data: dict = Depends(get_customer_account)):
     customer: CustomerAccount = customer_data.get("account")
     result: dict = {"token": customer_data.get("token")}
-    
-    result["trolley"] = customer.get_trolly(db)
+
+    result["trolley"] = customer.get_trolley(db)
     return result
 
 
@@ -64,7 +64,7 @@ def add_to_trolly_route(item: TrollyItem, db: Database = Depends(get_db), custom
     customer: CustomerAccount = customer_data.get("account")
     result: dict = {"token": customer_data.get("token")}
 
-    success: bool = customer.add_to_trolly(db, item.product_id, item.amount)
+    success: bool = customer.add_to_trolley(db, item.product_id, item.amount)
     if success:
         result["message"] = "Item has been added to the trolley"
     else:
@@ -75,8 +75,8 @@ def add_to_trolly_route(item: TrollyItem, db: Database = Depends(get_db), custom
 def remove_from_trolly_route(item: TrollyItem, db: Database = Depends(get_db), customer_data: dict = Depends(get_customer_account)):
     customer: CustomerAccount = customer_data.get("account")
     result: dict = {"token": customer_data.get("token")}
-    
-    success: bool = customer.remove_from_trolly(db, item.product_id, item.amount)
+
+    success: bool = customer.remove_from_trolley(db, item.product_id, item.amount)
     if success:
         result["message"] = "Item has been removed from the trolley"
     else:
@@ -87,7 +87,7 @@ def remove_from_trolly_route(item: TrollyItem, db: Database = Depends(get_db), c
 def clear_trolly_route(db: Database = Depends(get_db), customer_data: dict = Depends(get_customer_account)):
     customer: CustomerAccount = customer_data.get("account")
     result: dict = {"token": customer_data.get("token")}
-    
+
     success: bool = customer.clear_trolly(db)
     if success:
         result["message"] = "Trolley has been cleared"
