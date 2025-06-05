@@ -1240,6 +1240,54 @@ class Database:
 			self.rollback()
 			raise
 
+	def get_order(self, orderID: Id, /) -> DictRow | None:
+		"""
+		Retrieves an order by its ID.
+
+		Args:
+			orderID: The ID of the order.
+
+		Returns:
+			A dictionary containing order data, or None if not found or error.
+		"""
+		query='''
+			SELECT orderID, accountID, addressID, date
+			FROM Order
+			WHERE orderID = %s
+		'''
+		return self._fetch_one(query, (orderID,))
+
+	def get_orders(self) -> list[DictRow] | None:
+		"""
+		Retrieves all orders from the database.
+
+		Returns:
+			A list containing all the orders. Returns empty list if none. Returns None on error.
+		"""
+		query='''
+			SELECT orderID, accountID, addressID, date
+			FROM Order
+		'''
+		return self._fetch_all(query, ())
+
+	def get_order_from_accounts(self, accountID: Id, /) -> list[DictRow] | None:
+		"""
+		Retrieves all orders made by an account.
+
+		Args:
+			accountID: The ID of the account to be sorted by.
+
+		Returns:
+			A list containing all the orders. Returns empty list if none. Returns None on error.
+		"""
+		query='''
+			SELECT o.orderID, o.accountID, o.addressID, o.date
+			FROM Order o
+			JOIN `Account` a ON o.accountID = a.accountID
+			WHERE o.accountID = %s
+		'''
+		return self._fetch_all(query, (accountID,))
+
 	# --- Invoice Management ---
 
 	def save_invoice(self, _accountId: Id, _orderId: Id, _data: bytes, /) -> Id:
