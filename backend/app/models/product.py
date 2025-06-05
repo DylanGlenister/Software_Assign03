@@ -1,8 +1,6 @@
 #------to update ------
 #instance per request 
 #on initialisation we put in a product ID and then it will call the database and get all the stuff for the product 
-
-
 from typing import List, Optional, Type
 from datetime import datetime
 from ..core.database import Database
@@ -131,100 +129,50 @@ class Product:
             'createdDate': self.created_date.isoformat() if self.created_date else None
         }
 
+    #combined increase and decrease availble for sale
     def update_available_for_sale(self, quantity: int) -> bool:
         """reduce available_for_sale when items added to trolley - so that 2 people cant but the last remaining"""
-        if self.available_for_sale >= quantity:
-            self.available_for_sale -= quantity
-            self.save_to_db()  
+        if quantity > 0:
+            # when dding to trolley - reduce available
+            if self.available_for_sale >= quantity:
+                self.available_for_sale -= quantity
+                self.save_to_db()
+                return True
+            return False
+        elif quantity < 0:
+            # wjen removing from trolley - increase available
+            self.available_for_sale += abs(quantity)
+            self.save_to_db()
             return True
-        return False
+        else:
+            return True
     
-    def increase_available_for_sale(self, quantity: int):
-        """increase available_for_sale when items removed from trolley without purchase"""
-        self.available_for_sale += quantity
-        self.save_to_db()  
+    #combine attribute update methods
+    #take product fields that need to be updated and updates them  and save changes to the database
+    #product.update_product(name="newname", price=10)
+    def update_product(self, **kwargs) -> bool:
+        """update product attributes"""
+        # Update attributes directly
+        for field, value in kwargs.items():
+            if hasattr(self, field):
+                setattr(self, field, value)
+    
+        return self.save_to_db()
+    
     
     def is_in_stock(self) -> bool:
         """check if product is in stock and available for sale."""
         return self.stock > 0 and self.available_for_sale >= 1
 
-    def reduce_stock(self, quantity: int) -> bool:
-        """reduce stock by given quantity """
-        if self.stock >= quantity:
-            self.stock -= quantity
-            return self.save_to_db()
-        return False
-
-    def add_stock(self, quantity: int) -> bool:
-        """add stock quantity """
+    #combine add and reduce stock
+    #product.adjust_stock(-10), product.adjust_stock(10)
+    def adjust_stock(self, quantity: int) -> bool:
+        """adjust sotck qty. positibe adds stock negative reduces stock"""
+        if quantity < 0 and self.stock < abs(quantity):
+            return False  # cant reduce when that much stock is not available
+    
         self.stock += quantity
         return self.save_to_db()
-
-    def update_price(self, new_price: float) -> bool:
-        """update product price"""
-        if new_price >= 0:
-            self.price = new_price
-            return self.save_to_db()
-        return False
-
-    def update_name(self, new_name: str) -> bool:
-        """update product name"""
-        if new_name and new_name.strip():
-            self.name = new_name.strip()
-            return self.save_to_db()
-        return False
-
-    def update_description(self, new_description: str) -> bool:
-        """update product description """
-        self.description = new_description
-        return self.save_to_db()
-
-    def update_stock(self, new_stock: int) -> bool:
-        """update product stock"""
-        if new_stock >= 0:
-            self.stock = new_stock
-            return self.save_to_db()
-        return False
-
-    def update_available_for_sale(self, new_available: int) -> bool:
-        """update available_for_sale quantity """
-        if new_available >= 0:
-            self.available_for_sale = new_available
-            return self.save_to_db()
-        return False
-
-    def set_images(self, images: List[str]) -> bool:
-        """set product images list """
-        self.images = images or []
-        return self.save_to_db()
-
-    def add_image(self, image_url: str) -> bool:
-        """add image to the product"""
-        if image_url and image_url not in self.images:
-            self.images.append(image_url)
-            return self.save_to_db()
-        return False
-
-    def remove_image(self, image_url: str) -> bool:
-        """remove image from the product"""
-        if image_url in self.images:
-            self.images.remove(image_url)
-            return self.save_to_db()
-        return False
-
-    def add_tag(self, tag: str) -> bool:
-        """add a tag to the product"""
-        if tag and tag not in self.tags:
-            self.tags.append(tag)
-            return self.save_to_db()
-        return False
-
-    def remove_tag(self, tag: str) -> bool:
-        """remove a tag """
-        if tag in self.tags:
-            self.tags.remove(tag)
-            return self.save_to_db()
-        return False
 
     def __str__(self):
         """string rep of the product"""
