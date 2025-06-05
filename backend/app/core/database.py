@@ -5,6 +5,7 @@ from typing import Any, Generator, TypeAlias
 import mariadb
 from fastapi import HTTPException, status
 
+from ..utils.fields import filter_dict
 from ..utils.settings import SETTINGS
 
 #class MockSettings:
@@ -384,8 +385,7 @@ class Database:
 			ValueError: If no valid fields to update are provided.
 			Exception: If the update operation fails.
 		"""
-		allowed_fields = {'email', 'password', 'firstname', 'lastname', 'role', 'status'}
-		valid_fields = {k: v for k, v in _fields.items() if k in allowed_fields}
+		valid_fields = filter_dict(_fields, {'email', 'password', 'firstname', 'lastname', 'role', 'status'})
 
 		if not valid_fields:
 			raise ValueError('No valid fields to update')
@@ -619,8 +619,7 @@ class Database:
 			ValueError: If no valid fields are provided.
 			Exception: If the update operation fails.
 		"""
-		allowed_fields = {'name', 'description', 'price', 'stock', 'available', 'discontinued'}
-		valid_fields = {k: v for k, v in _fields.items() if k in allowed_fields}
+		valid_fields = filter_dict(_fields, {'name', 'description', 'price', 'stock', 'available', 'discontinued'})
 
 		if not valid_fields:
 			raise ValueError('No valid fields provided for update_product.')
