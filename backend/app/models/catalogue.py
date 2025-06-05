@@ -1,6 +1,6 @@
+from ..core.database import Database
 from .product import Product
 
-from ..core.database import Database
 
 class Catalogue:
     """
@@ -12,14 +12,14 @@ class Catalogue:
         self.db = db
         self._products = []
 
-    def get_all_products(self) -> list[Product]:
+    def get_all_products(self):
         """Get all products from database."""
         products = self.db.get_products()
 
         if not products:
             raise ValueError('No products found in database')
 
-        result: list[Product] = []
+        self._products = []
 
         for product in products:
             product_id = product.get('productID')
@@ -27,22 +27,19 @@ class Catalogue:
             if not product_id:
                 raise ValueError('Unknown error reading productID')
 
-            result.append(Product(product_id, self.db))
-
-        return result
+            self._products.append(Product(product_id, self.db))
 
     def search_products(self, search_term: str, /) -> list[Product]:
         """
         Search products by name, description, or tags.
         """
-        all_products = self.get_all_products()
         if not search_term:
-            return all_products
+            return self._products
 
         search_term = search_term.lower()
         matching_products = []
 
-        for product in all_products:
+        for product in self._products:
             # Check name
             if search_term in product.name.lower():
                 matching_products.append(product)
@@ -61,7 +58,7 @@ class Catalogue:
 
         return matching_products
 
-    def search_products_by_criteria(self, *tags) -> list[Product]:
+    def get_products_by_tag(self, *tags):
         """
         Search products using database-level search criteria.
 
@@ -76,7 +73,7 @@ class Catalogue:
         if not products:
             raise ValueError('No products found in database')
 
-        result: list[Product] = []
+        self._products = []
 
         for product in products:
             product_id = product.get('productID')
@@ -84,26 +81,18 @@ class Catalogue:
             if not product_id:
                 raise ValueError('Unknown error reading productID')
 
-            result.append(Product(product_id, self.db))
-
-        return result
+            self._products.append(Product(product_id, self.db))
 
     #Filtering and sorting
 
-    def filter_by_availability(self, products: list[Product], /) -> list[Product]:
+    def filter_by_availability(self, products: list[Product], /):
         """
         Filter products to show only those available for sale.
         """
-        if products is None:
-            products = self.get_all_products()
+        self._products = [product for product in products if product.available_for_sale >= 1]
 
-        return [product for product in products if product.available_for_sale >= 1]
-
-    def sort_by_price(self, products: list[Product], low_to_high: bool = True, /) -> list[Product]:
+    def sort_by_price(self, products: list[Product], low_to_high: bool = True, /):
         """
         Sort products by price.
         """
-        if products is None:
-            products = self.get_all_products()
-
-        return sorted(products, key=lambda p: p.price, reverse=not low_to_high)
+        self._products = sorted(products, key=lambda p: p.price, reverse=not low_to_high)
