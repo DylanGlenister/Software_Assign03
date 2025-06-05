@@ -1,13 +1,26 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, Generator
+from typing import Any, Generator, TypeAlias
 
 import mariadb
 from fastapi import HTTPException, status
 
+from ..utils.fields import filter_dict
 from ..utils.settings import SETTINGS
 
-# TODO Currently _execute can return 3 types, dependent on parameters. This fuckery trickles to all code that uses this function.
+#class MockSettings:
+#	database_username: str = 'admin'
+#	database_password: str = 'password'
+#	database_host: str = 'localhost'
+#	database_port: int = 3306
+#	database: str = 'awe_electronics'
+
+#SETTINGS = MockSettings()
+
+# Type aliases
+DictRow: TypeAlias = dict[str, Any]
+Id: TypeAlias = int
+
 
 class Role(Enum):
 	"""
@@ -44,7 +57,7 @@ class Database:
 		if cls.__pool:
 			return
 		try:
-			print(cls.__pool)
+			print(f'Attempting to create connection pool for database \'{SETTINGS.database}\' on {SETTINGS.database_host}:{SETTINGS.database_port}')
 			cls.__pool = mariadb.ConnectionPool(
 				pool_name='mypool',
 				pool_size=5,
@@ -56,188 +69,200 @@ class Database:
 			)
 			print('Connection pool created successfully')
 		except mariadb.Error as e:
-			print(f"Error creating connection pool: {e}")
+			print(f'Error creating connection pool: {e}')
 			error_message_lower = str(e).lower()
-			is_access_denied = "access denied" in error_message_lower or (hasattr(e, 'errno') and e.errno == 1045)
+			is_access_denied = 'access denied' in error_message_lower or (hasattr(e, 'errno') and e.errno == 1045)
 
 			if is_access_denied:
-				detail_message = f"Database pool initialization failed: Access Denied. Check credentials. (Error: {e})"
+				detail_message = f'Database pool initialization failed: Access Denied. Check credentials. (Error: {e})'
 			else:
-				detail_message = f"Database pool initialization failed: {e}"
+				detail_message = f'Database pool initialization failed: {e}'
 
 			raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=detail_message
-            )
+				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+				detail=detail_message
+			)
 
 	@classmethod
 	def get_connection(cls) -> mariadb.Connection:
 		"""
-		Get a connection from the connection pool.
+		Retrieves a connection from the pool.
+		Initializes the pool if it doesn't exist.
 
 		Returns:
-			MariaDB connection object
+			A MariaDB connection object.
+
+		Raises:
+			HTTPException: If a connection cannot be obtained.
 		"""
 		if not cls.__pool:
 			cls.initialize_pool()
 
 		try:
-			assert cls.__pool is not None
-			return cls.__pool.get_connection()
+			assert cls.__pool is not None, 'Connection pool is not initialized'
+			conn = cls.__pool.get_connection()
+			return conn
 		except mariadb.Error as e:
-			print(f"Error getting connection from pool: {e}")
-
+			print(f'Error getting connection from pool: {e}')
 			raise HTTPException(
 				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-				detail=f"Failed to get connection from database pool: {e}"
+				detail=f'Failed to get connection from database pool: {e}'
+			)
+		except AssertionError as e:
+			print(f'Assertion error: {e}')
+			raise HTTPException(
+				status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+				detail=str(e)
 			)
 
 	def __init__(self, _conn: mariadb.Connection, /):
 		"""
-		Initialize Database instance with a connection.
+		Initializes the Database instance with a MariaDB connection.
 
 		Args:
-			_conn: MariaDB connection object
+			_conn: A MariaDB connection object.
 		"""
 		self.conn: mariadb.Connection = _conn
 		self.cur: mariadb.Cursor = _conn.cursor()
+		self.conn.autocommit = False # Ensure autocommit is off for manual transaction control
 
 	def close(self):
-		"""Close cursor and connection."""
-		self.cur.close()
-		self.conn.close()
+		"""Closes the database cursor and connection."""
+		if hasattr(self, 'cur') and self.cur:
+			self.cur.close()
+		if hasattr(self, 'conn') and self.conn:
+			# Rollback any pending transaction if the connection is closed without explicit commit/rollback
+			try:
+				if self.conn.autocommit:
+					self.conn.rollback() # Potentially rollback if not committed
+			except mariadb.Error as e:
+				print(f'Error during implicit rollback on close: {e}')
+			finally:
+				self.conn.close()
+		print('Database connection closed.')
 
 	def commit(self):
-		"""Commit current transaction."""
-		self.conn.commit()
+		"""Commits the current transaction."""
+		try:
+			self.conn.commit()
+		except mariadb.Error as e:
+			print(f'Error during commit: {e}')
+			raise # Re-raise the error to be handled by the caller or get_db
 
 	def rollback(self):
-		"""Rollback current transaction."""
-		self.conn.rollback()
+		"""Rolls back the current transaction."""
+		try:
+			self.conn.rollback()
+		except mariadb.Error as e:
+			print(f'Error during rollback: {e}')
 
 	# --- Internal query helpers ---
 
-	def _fetch_one(self, _query: str, _params: tuple = (), /) -> dict[str, Any] | None:
+	def _fetch_one(self, _query: str, _params: tuple = (), /) -> DictRow | None:
 		"""
-		Execute a query and return a single row as a dictionary.
+		Executes a query and fetches a single row.
 
 		Args:
-			_query: SQL query string
-			_params: Query parameters
+			_query: The SQL query string.
+			_params: A tuple of parameters for the query.
 
 		Returns:
-			Single row as dict or None if no results/error
+			A dictionary representing the row, or None if no row is found or an error occurs.
 		"""
 		try:
 			self.cur.execute(_query, _params)
-			row = self.cur.fetchone()
-
+			row: tuple | None = self.cur.fetchone()
 			if row is None:
 				return None
-
-			# Convert to dictionary using column descriptions
-			columns = [desc[0] for desc in self.cur.description]
+			columns: list[str] = [desc[0] for desc in self.cur.description or []]
 			return dict(zip(columns, row))
-
 		except mariadb.Error as e:
-			print(f'DB error in fetchone: {e}')
+			print(f'DB error in _fetch_one: {e}')
 			return None
 		except Exception as e:
-			print(f'Unexpected error in fetchone: {e}')
+			print(f'Unexpected error in _fetch_one: {e}')
 			return None
 
-	def _fetch_all(self, _query: str, _params: tuple = (), /) -> list[dict[str, Any]] | None:
+	def _fetch_all(self, _query: str, _params: tuple = (), /) -> list[DictRow] | None:
 		"""
-		Execute a query and return all rows as a list of dictionaries.
+		Executes a query and fetches all rows.
 
 		Args:
-			_query: SQL query string
-			_params: Query parameters
+			_query: The SQL query string.
+			_params: A tuple of parameters for the query.
 
 		Returns:
-			list of rows as dictionaries or None if no results/error
+			A list of dictionaries representing the rows, or an empty list if no rows are found.
+			Returns None if a database error occurs.
 		"""
 		try:
 			self.cur.execute(_query, _params)
-			rows = self.cur.fetchall()
+			rows: list[tuple] | None = self.cur.fetchall()
 
 			if not rows:
-				return None
+				return []
 
-			# Convert to list of dictionaries using column descriptions
-			columns = [desc[0] for desc in self.cur.description]
+			columns: list[str] = [desc[0] for desc in self.cur.description or []]
 			return [dict(zip(columns, row)) for row in rows]
 
 		except mariadb.Error as e:
-			print(f'DB error in fetchall: {e}')
+			print(f'DB error in _fetch_all: {e}')
 			return None
 		except Exception as e:
-			print(f'Unexpected error in fetchall: {e}')
+			print(f'Unexpected error in _fetch_all: {e}')
 			return None
 
-	def _execute(self, _query: str, _params: tuple = (), /, *, _returnLastId: bool = False) -> int | None:
+	def _execute(self, _query: str, _params: tuple = (), /, *, _returnLastId: bool = False) -> int | Id | None:
 		"""
-		Execute a query that modifies data (INSERT, UPDATE, DELETE).
+		Executes a given SQL query (INSERT, UPDATE, DELETE) without committing or rolling back.
+		The calling public method is responsible for transaction management.
 
 		Args:
-			_query: SQL query string
-			_params: Query parameters
-			_returnLastId: Whether to return the last inserted row ID
+			_query: The SQL query string.
+			_params: A tuple of parameters for the query.
+			_returnLastId: If True, returns the last inserted row ID. Otherwise, returns the number of affected rows.
 
 		Returns:
-			- If _returnLastId=True: last row ID (int) or None on error
-			- If _returnLastId=False: True on success, False on error
+			The last inserted row ID (as Id) if _returnLastId is True and insert was successful.
+			The number of affected rows for other operations.
+			None if _returnLastId is True and no row was inserted/affected.
+			Raises mariadb.Error on database execution errors.
 		"""
-		try:
-			self.cur.execute(_query, _params)
-			affected_rows = self.cur.rowcount
-			self.commit()
+		self.cur.execute(_query, _params)
+		affected_rows: int = self.cur.rowcount
 
-			if not _returnLastId:
-				return None
-
-			return self.cur.lastrowid if affected_rows > 0 else None
-
-		except mariadb.Error as e:
-			print(f'DB error in execute: {e}, rolling back')
-			try:
-				self.rollback()
-			except Exception as rollback_error:
-				print(f'Error during rollback: {rollback_error}')
-			return None
-
-		except Exception as e:
-			print(f'Unexpected error in execute: {e}, rolling back')
-			try:
-				self.rollback()
-			except Exception as rollback_error:
-				print(f'Error during rollback: {rollback_error}')
-			return None
+		if _returnLastId:
+			return self.cur.lastrowid if affected_rows > 0 and self.cur.lastrowid is not None else None
+		return affected_rows
 
 	# --- Account Management ---
 
 	def get_account(
 		self,
 		*,
-		_accountId: int | None = None,
+		_accountId: Id | None = None,
 		_email: str | None = None
-	) -> dict[str, Any] | None:
+	) -> DictRow | None:
 		"""
-		Retrieve information about an account using an accessor.
+		Retrieves a single account by its ID or email.
 
 		Args:
-			_accountId: Account ID to search by
-			_email: Email to search by
+			_accountId: The ID of the account to retrieve.
+			_email: The email of the account to retrieve.
+					Exactly one of _accountId or _email must be provided.
 
 		Returns:
-			A dictionary containing information about the account or None
+			A dictionary containing account data if found, otherwise None.
+
+		Raises:
+			ValueError: If neither or both _accountId and _email are provided.
 		"""
 		args_num = sum(x is not None for x in [_accountId, _email])
 
 		if args_num == 0:
-			raise ValueError("Must provide exactly one of: _accountId or _email")
+			raise ValueError('Must provide exactly one of: _accountId or _email')
 		elif args_num > 1:
-			raise ValueError("Keyword arguments are mutually exclusive")
+			raise ValueError('Keyword arguments _accountId and _email are mutually exclusive')
 
 		if _accountId is not None:
 			query = '''
@@ -246,7 +271,7 @@ class Database:
 				WHERE accountID = %s
 			'''
 			params = (_accountId,)
-		else:
+		else: # _email is not None
 			query = '''
 				SELECT accountID, email, password, firstname, lastname, creationDate, role, status
 				FROM Account
@@ -259,154 +284,198 @@ class Database:
 	def get_accounts(
 		self,
 		*,
-		role: Role | None = None,
-		status: Status | None = None,
-		olderThan: int | None = None
-	) -> list[dict[str, Any]] | None:
+		_role: Role | None = None,
+		_status: Status | None = None,
+		_olderThanDays: int | None = None
+	) -> list[DictRow] | None:
 		"""
-		Retrieve accounts with optional filtering by role and/or status.
-		If no filters are provided, returns all accounts.
+		Retrieves multiple accounts based on optional filtering criteria.
 
 		Args:
-			role: Optional role to filter by
-			status: Optional status to filter by
-			olderThan: Optional int which signifies days, and can get accounts older than x days
+			_role: Filter accounts by role.
+			_status: Filter accounts by status.
+			_olderThanDays: Filter accounts created earlier than this many days ago.
 
 		Returns:
-			list of account dictionaries or None if no results/error
+			A list of dictionaries, each representing an account, or None if an error occurs.
+			Returns an empty list if no accounts match the criteria.
 		"""
 		query = '''
 			SELECT accountID, email, firstname, lastname, creationDate, role, status
 			FROM Account
 		'''
-		conditions = []
-		params = []
+		conditions: list[str] = []
+		params_list: list[Any] = []
 
-		if role is not None:
-			conditions.append("role = %s")
-			params.append(role.value)
+		if _role is not None:
+			conditions.append('role = %s')
+			params_list.append(_role.value)
 
-		if status is not None:
-			conditions.append("status = %s")
-			params.append(status.value)
+		if _status is not None:
+			conditions.append('status = %s')
+			params_list.append(_status.value)
 
-		if olderThan is not None:
-			conditions.append("creationDate < DATE_SUB(CURDATE(), INTERVAL %s DAY)")
-			params.append(olderThan)
+		if _olderThanDays is not None:
+			conditions.append('creationDate < DATE_SUB(CURDATE(), INTERVAL %s DAY)')
+			params_list.append(_olderThanDays)
 
 		if conditions:
-			query += " WHERE " + " AND ".join(conditions)
+			query += ' WHERE ' + ' AND '.join(conditions)
 
-		return self._fetch_all(query, tuple(params) if params else ())
+		return self._fetch_all(query, tuple(params_list))
 
 	def create_account(
 		self,
 		_email: str,
 		_password: str,
 		_role: Role = Role.GUEST,
-		*,
+		/,
 		_firstName: str | None = None,
 		_lastName: str | None = None,
+		*,
 		_creationDate: datetime = datetime.now()
-	) -> int | None:
+	) -> Id:
 		"""
-		Create a new account in the database.
+		Creates a new account.
 
 		Args:
-			_email: The email for the account
-			_password: The password for the account
-			_role: The role for the account
-			_firstName: Optional first name
-			_lastName: Optional last name
-			_creationDate: Optional creation date (defaults to now)
+			_email: The email for the new account.
+			_password: The hashed password for the new account.
+			_role: The role for the new account (defaults to GUEST).
+			_firstName: Optional first name.
+			_lastName: Optional last name.
+			_creationDate: Optional creation date (defaults to datetime.now()).
 
 		Returns:
-			Account ID of created account or None on error
+			The accountID of the newly created account.
+
+		Raises:
+			Exception: If account creation fails.
 		"""
+		creation_date_str = _creationDate.strftime('%Y-%m-%d %H:%M:%S')
+		query = '''
+			INSERT INTO Account (email, password, firstname, lastname, creationDate, role)
+			VALUES (%s, %s, %s, %s, %s, %s)
+		'''
+		params = (_email, _password, _firstName, _lastName, creation_date_str, _role.value)
+		try:
+			account_id = self._execute(query, params, _returnLastId=True)
+			if account_id is None:
+				raise Exception('Account creation failed, no ID returned.')
+			self.commit()
+			return account_id
+		except Exception as e:
+			print(f'Error in create_account: {e}')
+			self.rollback()
+			raise # Re-raise the exception to be handled by the caller or get_db
 
-		creation_date_str = _creationDate.strftime("%Y-%m-%d %H:%M:%S")
-
-		if _firstName is not None and _lastName is not None:
-			query = '''
-				INSERT INTO Account (email, password, firstname, lastname, creationDate, role)
-				VALUES (%s, %s, %s, %s, %s, %s)
-			'''
-			params = (_email, _password, _firstName, _lastName, creation_date_str, _role.value)
-		else:
-			query = '''
-				INSERT INTO Account (email, password, creationDate, role)
-				VALUES (%s, %s, %s, %s)
-			'''
-			params = (_email, _password, creation_date_str, _role.value)
-
-		return self._execute(query, params, _returnLastId=True)
-
-	# NOTE Using dictonary args might be a bit fucky but it seems the best for the case.
-	def update_account(self, _accountId: int, /, **_fields) -> int | None:
+	def update_account(self, _accountId: Id, /, **_fields: Any) -> int:
 		"""
-		Update account fields.
+		Updates specified fields for an existing account.
 
 		Args:
-			_accountId: Account ID to update
-			**_fields: Fields to update
+			_accountId: The ID of the account to update.
+			_fields: Keyword arguments where keys are column names and values are the new values.
+					 Allowed fields: 'email', 'password', 'firstname', 'lastname', 'role', 'status'.
 
 		Returns:
-			True on success, False on error
+			The number of affected rows.
+
+		Raises:
+			ValueError: If no valid fields to update are provided.
+			Exception: If the update operation fails.
 		"""
-		if not _fields:
-			return False
+		valid_fields = filter_dict(_fields, {'email', 'password', 'firstname', 'lastname', 'role', 'status'})
 
-		set_clause = ', '.join(f'{key} = %s' for key in _fields)
-		params = tuple(_fields.values()) + (_accountId,)
+		if not valid_fields:
+			raise ValueError('No valid fields to update')
 
+		if 'role' in valid_fields and isinstance(valid_fields['role'], Role):
+			valid_fields['role'] = valid_fields['role'].value
+		if 'status' in valid_fields and isinstance(valid_fields['status'], Status):
+			valid_fields['status'] = valid_fields['status'].value
+
+		set_clause = ', '.join(f'{key} = %s' for key in valid_fields)
+		params = tuple(valid_fields.values()) + (_accountId,)
 		query = f'UPDATE Account SET {set_clause} WHERE accountID = %s'
-		return self._execute(query, params)
 
-	def delete_accounts(self, _accountIds: list[int], /) -> int | None:
+		try:
+			affected_rows = self._execute(query, params)
+			if affected_rows is None:
+				raise Exception('Update account operation failed unexpectedly.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in update_account: {e}')
+			self.rollback()
+			raise
+
+	def delete_accounts(self, _accountIds: set[Id], /) -> int:
 		"""
-		Delete accounts from the database. Deleting an account deletes all associated addresses and the entry in the order will be set to null.
+		Deletes one or more accounts by their IDs.
 
 		Args:
-			_accountIds: List of account IDs to delete
+			_accountIds: A set of account IDs to delete.
 
 		Returns:
-			True on success, False on error
+			The number of accounts successfully deleted. Returns 0 if _accountIds is empty.
+
+		Raises:
+			Exception: If the delete operation fails.
 		"""
 		if not _accountIds:
-			return False  # Nothing to delete
+			return 0
 
 		placeholders = ', '.join(['%s'] * len(_accountIds))
 		query = f'DELETE FROM Account WHERE accountID IN ({placeholders})'
-		return self._execute(query, tuple(_accountIds))
+		try:
+			affected_rows = self._execute(query, tuple(_accountIds))
+			if affected_rows is None:
+				raise Exception('Delete accounts operation failed unexpectedly.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in delete_accounts: {e}')
+			self.rollback()
+			raise
 
 	# --- Address Management ---
 
-	def create_address(self, _accountId: int, _location: str, /) -> int | None:
+	def create_address(self, _accountId: Id, _location: str, /) -> Id:
 		"""
-		Create a new address for an account.
+		Creates a new address for a given account.
 
 		Args:
-			_accountId: Account ID to link address to
-			_location: Address location string
+			_accountId: The ID of the account this address belongs to.
+			_location: The location description of the address.
 
 		Returns:
-			Address ID or None on error
-		"""
-		query = '''
-			INSERT INTO Address (accountID, location)
-			VALUES (%s, %s)
-		'''
-		return self._execute(query, (_accountId, _location), _returnLastId=True)
+			The addressID of the newly created address.
 
-	def get_addresses(self, _accountId: int, /) -> list[dict[str, Any]] | None:
+		Raises:
+			Exception: If address creation fails.
 		"""
-		Get all addresses for an account.
+		query = 'INSERT INTO Address (accountID, location) VALUES (%s, %s)'
+		try:
+			address_id = self._execute(query, (_accountId, _location), _returnLastId=True)
+			if address_id is None:
+				raise Exception('Address creation failed, no ID returned.')
+			self.commit()
+			return address_id
+		except Exception as e:
+			print(f'Error in create_address: {e}')
+			self.rollback()
+			raise
+
+	def get_addresses(self, _accountId: Id, /) -> list[DictRow] | None:
+		"""
+		Retrieves all addresses associated with a given account.
 
 		Args:
-			_accountId: Account ID to get addresses for
+			_accountId: The ID of the account.
 
 		Returns:
-			list of address dictionaries or None
+			A list of dictionaries, each representing an address. Returns empty list if none.
 		"""
 		query = '''
 			SELECT addressID, accountID, location
@@ -415,57 +484,199 @@ class Database:
 		'''
 		return self._fetch_all(query, (_accountId,))
 
-	def delete_address(self, _addressId: int, /) -> int | None:
+	def modify_address(self, _addressId: Id, _location: str, /) -> int:
 		"""
-		Delete an address. Generally you want to avoid doing this. Deleting an account deletes all associated addresses and the entry in the order will be set to null.
+		Modifies the location of an existing address.
 
 		Args:
-			_addressId: Address ID to delete
+			_addressId: The ID of the address to modify.
+			_location: The new location description.
 
 		Returns:
-			True on success, False on error
+			The number of affected rows.
+
+		Raises:
+			Exception: If the modify operation fails.
+		"""
+		query = 'UPDATE Address SET location = %s WHERE addressID = %s'
+		try:
+			affected_rows = self._execute(query, (_location, _addressId))
+			if affected_rows is None:
+				raise Exception('Modify address operation failed unexpectedly.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in modify_address: {e}')
+			self.rollback()
+			raise
+
+	def delete_address(self, _addressId: Id, /) -> int:
+		"""
+		Deletes an address by its ID.
+
+		Args:
+			_addressId: The ID of the address to delete.
+
+		Returns:
+			The number of affected rows.
+
+		Raises:
+			Exception: If the delete operation fails.
 		"""
 		query = 'DELETE FROM Address WHERE addressID = %s'
-		return self._execute(query, (_addressId,))
+		try:
+			affected_rows = self._execute(query, (_addressId,))
+			if affected_rows is None:
+				raise Exception('Delete address operation failed unexpectedly.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in delete_address: {e}')
+			self.rollback()
+			raise
 
 	# --- Product Management ---
 
-	def get_products_with_tags(self, _tagIds: list[int] | None = None, /) -> list[dict[str, Any]] | None:
+	def add_product(
+		self,
+		_name: str,
+		_description: str,
+		_price: float = 9999999999.0,
+		/,
+		_stock: int = 0,
+		_available: int = 0,
+		*,
+		_creationDate: datetime = datetime.now(),
+		_discontinued: bool = False
+	) -> Id:
 		"""
-		Get all products, optionally filtered by tags.
+		Adds a new product to the database.
 
 		Args:
-			_tagIds: Optional list of tag IDs to filter by
+			_name: Name of the product.
+			_description: Description of the product.
+			_price: Price of the product.
+			_stock: Current quantity in stock (defaults to 0).
+			_available: Quantity available for purchase (defaults to 0).
+			_creationDate: Date of product creation (defaults to now).
+			_discontinued: Whether the product is discontinued (defaults to False).
 
 		Returns:
-			list of product dictionaries or None
-		"""
-		if _tagIds:
-			placeholders = ','.join(['%s'] * len(_tagIds))
-			query = f'''
-				SELECT DISTINCT p.productID, p.name, p.description, p.price,
-					   p.stock, p.available, p.creationDate, p.discontinued
-				FROM Product p
-				JOIN `Product-Tag` pt ON p.productID = pt.productID
-				WHERE pt.tagID IN ({placeholders})
-			'''
-			return self._fetch_all(query, tuple(_tagIds))
-		else:
-			query = '''
-				SELECT productID, name, description, price, stock, available, creationDate, discontinued
-				FROM Product
-			'''
-			return self._fetch_all(query)
+			The productID of the newly added product.
 
-	def get_product_images(self, _productId: int, /) -> list[str] | None:
+		Raises:
+			Exception: If product creation fails.
 		"""
-		Get image URLs associated with a product.
+		creation_date_str = _creationDate.strftime('%Y-%m-%d %H:%M:%S')
+		discontinued_int = 1 if _discontinued else 0
+
+		query = '''
+			INSERT INTO Product (name, description, price, stock, available, creationDate, discontinued)
+			VALUES (%s, %s, %s, %s, %s, %s, %s)
+		'''
+		params = (_name, _description, _price, _stock, _available, creation_date_str, discontinued_int)
+		try:
+			product_id = self._execute(query, params, _returnLastId=True)
+			if product_id is None:
+				raise Exception('Product creation failed, no ID returned.')
+			self.commit()
+			return product_id
+		except Exception as e:
+			print(f'Error in add_product: {e}')
+			self.rollback()
+			raise
+
+	def get_product(self, _productId: Id) -> DictRow | None:
+		"""
+		Retrieves a single product by its ID.
 
 		Args:
-			_productId: Product ID to get images for
+			_productId: The ID of the product to retrieve.
 
 		Returns:
-			list of image URLs or None
+			A dictionary containing product data if found, otherwise None.
+		"""
+		query = '''
+			SELECT productID, name, description, price, stock, available, creationDate, discontinued
+			FROM Product
+			WHERE productID = %s
+		'''
+		return self._fetch_one(query, (_productId,))
+
+	def update_product(self, _productId: Id, /, **_fields: Any) -> int:
+		"""
+		Updates specified fields for an existing product.
+
+		Args:
+			_productId: The ID of the product to update.
+			_fields: Keyword arguments for fields to update.
+					 Allowed fields: 'name', 'description', 'price', 'stock', 'available', 'discontinued'.
+
+		Returns:
+			The number of affected rows.
+
+		Raises:
+			ValueError: If no valid fields are provided.
+			Exception: If the update operation fails.
+		"""
+		valid_fields = filter_dict(_fields, {'name', 'description', 'price', 'stock', 'available', 'discontinued'})
+
+		if not valid_fields:
+			raise ValueError('No valid fields provided for update_product.')
+
+		if 'discontinued' in valid_fields:
+			valid_fields['discontinued'] = 1 if valid_fields['discontinued'] else 0
+
+		set_clause = ', '.join(f'{key} = %s' for key in valid_fields)
+		params = tuple(valid_fields.values()) + (_productId,)
+		query = f'UPDATE Product SET {set_clause} WHERE productID = %s'
+		try:
+			affected_rows = self._execute(query, params)
+			if affected_rows is None:
+				raise Exception('Update product operation failed unexpectedly.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in update_product: {e}')
+			self.rollback()
+			raise
+
+	def set_product_discontinued(self, _productId: Id, _state: bool = True, /) -> int:
+		"""
+		Sets the discontinued status of a product.
+
+		Args:
+			_productId: The ID of the product.
+			_state: True to mark as discontinued, False to mark as not discontinued.
+
+		Returns:
+			The number of affected rows.
+
+		Raises:
+			Exception: If the operation fails.
+		"""
+		discontinued_int = 1 if _state else 0
+		query = 'UPDATE Product SET discontinued = %s WHERE productID = %s'
+		try:
+			affected_rows = self._execute(query, (discontinued_int, _productId))
+			if affected_rows is None:
+				raise Exception('Set product discontinued operation failed unexpectedly.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in set_product_discontinued: {e}')
+			self.rollback()
+			raise
+
+	def get_product_images(self, _productId: Id, /) -> list[str] | None:
+		"""
+		Retrieves all image URLs for a given product.
+
+		Args:
+			_productId: The ID of the product.
+
+		Returns:
+			A list of image URLs. Returns empty list if none. Returns None on error.
 		"""
 		query = '''
 			SELECT i.url
@@ -474,196 +685,591 @@ class Database:
 			WHERE pi.productID = %s
 		'''
 		result = self._fetch_all(query, (_productId,))
-		return [row['url'] for row in result] if result else None
+		if result is None:
+			return None # Error case from _fetch_all
+		return [row['url'] for row in result]
+
+	def get_products(self, _tags: list[str] | None = None, /) -> list[DictRow] | None:
+		"""
+		Retrieves products. If tags are provided, retrieves products matching ALL specified tags.
+		If no tags are provided, retrieves all products.
+
+		Args:
+			_tags: A list of tag names to filter by.
+
+		Returns:
+			A list of dictionaries, each representing a product. Returns empty list if none. Returns None on error.
+		"""
+		if not _tags:
+			query = '''
+				SELECT productID, name, description, price, stock, available, creationDate, discontinued
+				FROM Product
+			'''
+			params = ()
+		else:
+			num_tags = len(_tags)
+			placeholders = ', '.join(['%s'] * num_tags)
+			query = f'''
+				SELECT p.productID, p.name, p.description, p.price,
+					   p.stock, p.available, p.creationDate, p.discontinued
+				FROM Product p
+				JOIN `Product-Tag` pt ON p.productID = pt.productID
+				JOIN `Tag` t ON pt.tagID = t.tagID
+				WHERE t.name IN ({placeholders})
+				GROUP BY p.productID
+				HAVING COUNT(DISTINCT t.tagID) = %s
+			'''
+			params = tuple(_tags) + (num_tags,)
+		return self._fetch_all(query, params)
+
+	def get_products_with_tagIDs(self, _tagIds: set[Id] | None = None, /) -> list[DictRow] | None:
+		"""
+		Retrieves products. If tag IDs are provided, retrieves products matching ALL specified tag IDs.
+		If no tag IDs are provided (None or empty set), retrieves all products.
+
+		Args:
+			_tagIds: A set of tag IDs to filter by. Can be None or empty to get all products.
+
+		Returns:
+			A list of dictionaries, each representing a product. Returns empty list if no products match.
+			Returns None if a database error occurs.
+		"""
+		if not _tagIds:
+			query = '''
+				SELECT productID, name, description, price, stock, available, creationDate, discontinued
+				FROM Product
+			'''
+			params = ()
+		else:
+			num_tags = len(_tagIds)
+			placeholders = ', '.join(['%s'] * num_tags)
+			query = f'''
+				SELECT p.productID, p.name, p.description, p.price,
+						p.stock, p.available, p.creationDate, p.discontinued
+				FROM Product p
+				JOIN `Product-Tag` pt ON p.productID = pt.productID
+				WHERE pt.tagID IN ({placeholders})
+				GROUP BY p.productID, p.name, p.description, p.price, p.stock, p.available, p.creationDate, p.discontinued
+				HAVING COUNT(DISTINCT pt.tagID) = %s
+			'''
+			params = tuple(_tagIds) + (num_tags,)
+
+		return self._fetch_all(query, params)
 
 	# --- Tag Management ---
 
-	def create_tag(self, _name: str, /) -> int | None:
+	def create_tag(self, _name: str, /) -> Id:
 		"""
-		Create a new tag.
+		Creates a new tag.
 
 		Args:
-			_name: Tag name
+			_name: The name of the tag.
 
 		Returns:
-			Tag ID or None on error
+			The tagID of the newly created tag.
+
+		Raises:
+			mariadb.IntegrityError: If the tag name already exists.
+			Exception: For other creation failures.
 		"""
 		query = 'INSERT INTO Tag (name) VALUES (%s)'
-		return self._execute(query, (_name,), _returnLastId=True)
+		try:
+			tag_id = self._execute(query, (_name,), _returnLastId=True)
+			if tag_id is None:
+				raise Exception('Tag creation failed, no ID returned.')
+			self.commit()
+			return tag_id
+		except mariadb.IntegrityError:
+			self.rollback() # Rollback if integrity error (e.g. duplicate name)
+			print(f'Tag with name \'{_name}\' likely already exists.')
+			raise # Re-raise to signal failure
+		except Exception as e:
+			print(f'Error in create_tag: {e}')
+			self.rollback()
+			raise
 
-	def get_tag_id(self, _name: str, /):
-		query = 'SELECT tagID FROM `Tag` WHERE name = %s'
-		# TODO Return -1 if no tag with that name is found
-		return self._execute(query, (_name,))
-
-	def get_all_tags(self):
-		# TODO Use _fetch_all to get all tags
-		return
-
-	def delete_tag(self, _tagId: int, /):
-		# TODO
-		return
-
-	def add_tag_to_product(self, _tagId: int, _productId: int, /) -> int | None:
+	def get_tag_id(self, _name: str, /) -> Id | None:
 		"""
-		Link a product to a tag.
+		Retrieves the ID of a tag by its name.
 
 		Args:
-			_productId: Product ID
-			_tagId: Tag ID
+			_name: The name of the tag.
 
 		Returns:
-			True on success, False on error
+			The tagID if found, otherwise None.
+		"""
+		query = 'SELECT tagID FROM `Tag` WHERE name = %s'
+		result = self._fetch_one(query, (_name,))
+		return result['tagID'] if result else None
+
+	def get_all_tags(self) -> list[DictRow] | None:
+		"""
+		Retrieves all tags from the database.
+
+		Returns:
+			A list of dictionaries, each representing a tag (tagID, name). Returns empty list if none. Returns None on error.
+		"""
+		query = 'SELECT tagID, name FROM Tag'
+		return self._fetch_all(query)
+
+	def delete_tag(self, _tagId: Id, /) -> int:
+		"""
+		Deletes a tag by its ID. Associated entries in Product-Tag will be cascade deleted.
+
+		Args:
+			_tagId: The ID of the tag to delete.
+
+		Returns:
+			The number of affected rows.
+
+		Raises:
+			Exception: If the delete operation fails.
+		"""
+		query = 'DELETE FROM Tag WHERE tagID = %s'
+		try:
+			affected_rows = self._execute(query, (_tagId,))
+			if affected_rows is None:
+				raise Exception('Delete tag operation failed unexpectedly.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in delete_tag: {e}')
+			self.rollback()
+			raise
+
+	def add_tag_to_product(self, _productId: Id, _tagId: Id, /) -> int:
+		"""
+		Associates a tag with a product.
+
+		Args:
+			_productId: The ID of the product.
+			_tagId: The ID of the tag.
+
+		Returns:
+			The number of affected rows.
+
+		Raises:
+			mariadb.IntegrityError: If the product already has the tag or an ID is invalid.
+			Exception: For other failures.
 		"""
 		query = 'INSERT INTO `Product-Tag` (productID, tagID) VALUES (%s, %s)'
-		return self._execute(query, (_productId, _tagId))
+		try:
+			affected_rows = self._execute(query, (_productId, _tagId))
+			if affected_rows is None:
+				raise Exception('Add tag to product operation failed unexpectedly.')
+			self.commit()
+			return affected_rows
+		except mariadb.IntegrityError:
+			self.rollback()
+			print(f'Product {_productId} already has tag {_tagId} or one of the IDs is invalid.')
+			raise
+		except Exception as e:
+			print(f'Error in add_tag_to_product: {e}')
+			self.rollback()
+			raise
 
-	def remove_tag_from_product(self, _tagId: int, _productId: int, /):
-		# TODO
-		return
+	def remove_tag_from_product(self, _productId: Id, _tagId: Id, /) -> int:
+		"""
+		Removes a tag association from a product.
+
+		Args:
+			_productId: The ID of the product.
+			_tagId: The ID of the tag.
+
+		Returns:
+			The number of affected rows.
+
+		Raises:
+			ValueError: If the tag is not associated with the product.
+			Exception: For other failures.
+		"""
+		query = 'DELETE FROM `Product-Tag` WHERE productID = %s AND tagID = %s'
+		try:
+			affected_rows = self._execute(query, (_productId, _tagId))
+			if affected_rows is None:
+				raise Exception('Remove tag from product operation failed unexpectedly.')
+			if affected_rows == 0:
+				raise ValueError(f'Tag ID {_tagId} is not associated with Product ID {_productId}.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in remove_tag_from_product: {e}')
+			if not isinstance(e, ValueError):
+				self.rollback()
+			raise
 
 	# --- Image Management ---
 
-	def add_image_to_product(self, _url: str, _productId: int, /) -> int | None:
+	def add_image_to_product(self, _url: str, _productId: Id, /) -> Id:
 		"""
-		Create a new image and link it to a product.
+		Adds an image and associates it with a product. This is an atomic operation.
 
 		Args:
-			_url: Image URL
-			_productId: Product ID to link to
+			_url: The URL of the image.
+			_productId: The ID of the product to associate the image with.
 
 		Returns:
-			Image ID or None on error
+			The imageID of the newly added image.
+
+		Raises:
+			Exception: If the operation fails.
 		"""
-		# Create image
-		image_query = 'INSERT INTO Image (url) VALUES (%s)'
-		image_id = self._execute(image_query, (_url,), _returnLastId=True)
+		try:
+			image_query = 'INSERT INTO Image (url) VALUES (%s)'
+			image_id = self._execute(image_query, (_url,), _returnLastId=True)
 
-		if image_id:
-			# Link to product
+			if image_id is None: # Should not happen if _execute works as expected and insert is valid
+				raise Exception('Failed to create image entry, image_id is None.')
+
 			link_query = 'INSERT INTO `Product-Image` (productID, imageID) VALUES (%s, %s)'
-			if self._execute(link_query, (_productId, image_id)):
-				return image_id
+			link_result = self._execute(link_query, (_productId, image_id))
 
-		return None
+			if link_result is None or link_result == 0:
+				raise Exception(f'Failed to link image {image_id} to product {_productId}.')
+
+			self.commit()
+			return image_id
+		except Exception as e:
+			print(f'Error in add_image_to_product: {e}')
+			self.rollback()
+			raise
+
+	def delete_image(self, _imageId: Id, /) -> int:
+		"""
+		Deletes an image by its ID. Associated entries in Product-Image will be cascade deleted.
+
+		Args:
+			_imageId: The ID of the image to delete.
+
+		Returns:
+			The number of affected rows.
+
+		Raises:
+			Exception: If the delete operation fails.
+		"""
+		query = 'DELETE FROM Image WHERE imageID = %s'
+		try:
+			affected_rows = self._execute(query, (_imageId,))
+			if affected_rows is None:
+				raise Exception('Delete image operation failed unexpectedly.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in delete_image: {e}')
+			self.rollback()
+			raise
 
 	# --- Trolley & Line Item Management ---
 
-	def get_trolley(self, _accountId: int, /) -> list[dict[str, Any]] | None:
+	def get_trolley(self, _accountId: Id, /) -> list[DictRow] | None:
 		"""
-		Get trolley contents for an account.
+		Retrieves all line items in an account's trolley.
 
 		Args:
-			_accountId: Account ID
+			_accountId: The ID of the account.
 
 		Returns:
-			list of trolley items or None
+			A list of dictionaries, each representing a line item in the trolley. Empty list if none. Returns None on error.
 		"""
 		query = '''
-			SELECT li.lineItemID, li.productID, li.quantity, li.priceAtSale
+			SELECT li.lineItemID, li.productID, p.name as productName,
+				   li.quantity, li.priceAtSale, p.price as currentPrice
 			FROM Trolley t
 			JOIN LineItem li ON t.lineItemID = li.lineItemID
+			JOIN Product p ON li.productID = p.productID
 			WHERE t.accountID = %s
 		'''
-		return self._fetch_all(query, (_accountId,)) or []
+		return self._fetch_all(query, (_accountId,))
 
-	def add_to_trolley(self, _accountId: int, _productId: int, _quantity: int = 1, /) -> int | None:
+	def add_to_trolley(self, _accountId: Id, _productId: Id, /, *, _quantity: int = 1) -> Id:
 		"""
-		Add item to trolley.
+		Adds a product to an account's trolley. This is an atomic operation.
 
 		Args:
-			_accountId: Account ID
-			_productId: Product ID
-			_quantity: Quantity to add
+			_accountId: The ID of the account.
+			_productId: The ID of the product to add.
+			_quantity: The quantity of the product to add.
 
 		Returns:
-			True on success, False on error
-		"""
-		# Create line item
-		line_item_query = 'INSERT INTO LineItem (productID, quantity) VALUES (%s, %s)'
-		line_item_id = self._execute(line_item_query, (_productId, _quantity), _returnLastId=True)
+			The lineItemID of the newly created line item.
 
-		if line_item_id:
-			# Add to trolley
+		Raises:
+			ValueError: If _quantity is less than 1.
+			Exception: For other failures.
+		"""
+		if _quantity < 1:
+			raise ValueError('Quantity must be at least 1.')
+		try:
+			line_item_query = 'INSERT INTO LineItem (productID, quantity) VALUES (%s, %s)'
+			line_item_id = self._execute(line_item_query, (_productId, _quantity), _returnLastId=True)
+
+			if line_item_id is None:
+				raise Exception('Failed to create line item, line_item_id is None.')
+
 			trolley_query = 'INSERT INTO Trolley (accountID, lineItemID) VALUES (%s, %s)'
-			return self._execute(trolley_query, (_accountId, line_item_id))
+			trolley_add_result = self._execute(trolley_query, (_accountId, line_item_id))
 
-		return False
+			if trolley_add_result is None or trolley_add_result == 0:
+				raise Exception(f'Failed to add line item {line_item_id} to trolley for account {_accountId}.')
 
-	def clear_trolley(self, _accountId: int, /) -> int | None:
+			self.commit()
+			return line_item_id
+		except Exception as e:
+			print(f'Error in add_to_trolley: {e}')
+			self.rollback()
+			raise
+
+	def change_quantity_of_product_in_trolley(
+		self, _accountId: Id, _productId: Id, _newQuantity: int, /
+	) -> int:
 		"""
-		Clear all items from trolley.
+		Changes the quantity of a product in an account's trolley.
 
 		Args:
-			_accountId: Account ID
+			_accountId: The ID of the account.
+			_productId: The ID of the product whose quantity is to be changed.
+			_newQuantity: The new quantity.
 
 		Returns:
-			True on success, False on error
+			The number of affected LineItem rows.
+
+		Raises:
+			ValueError: If _newQuantity is less than 1, or if the product is not found in the trolley.
+			Exception: For other failures.
 		"""
-		query = 'DELETE FROM Trolley WHERE accountID = %s'
-		return self._execute(query, (_accountId,))
+		if _newQuantity < 1:
+			raise ValueError('New quantity must be at least 1.')
+
+		try:
+			find_query = '''
+				SELECT t.lineItemID
+				FROM Trolley t
+				JOIN LineItem li ON t.lineItemID = li.lineItemID
+				WHERE t.accountID = %s AND li.productID = %s
+			'''
+			item = self._fetch_one(find_query, (_accountId, _productId))
+
+			if not item:
+				raise ValueError(f'Product ID {_productId} not found in trolley for account ID {_accountId}.')
+
+			line_item_id: Id = item['lineItemID']
+
+			update_query = 'UPDATE LineItem SET quantity = %s WHERE lineItemID = %s'
+			affected_rows = self._execute(update_query, (_newQuantity, line_item_id))
+			if affected_rows is None:
+				raise Exception('Change quantity operation failed unexpectedly.')
+			self.commit()
+			return affected_rows
+		except Exception as e:
+			print(f'Error in change_quantity_of_product_in_trolley: {e}')
+			self.rollback()
+			raise
+
+	def remove_from_trolley(self, _accountId: Id, _lineItemId: Id, /) -> tuple[int, int]:
+		"""
+		Removes a specific line item from an account's trolley and deletes the line item itself.
+		This is an atomic operation.
+
+		Args:
+			_accountId: The ID of the account.
+			_lineItemId: The ID of the line item to remove.
+
+		Returns:
+			A tuple containing: (affected rows from Trolley deletion, affected rows from LineItem deletion).
+
+		Raises:
+			ValueError: If the line item is not found in the specified account's trolley.
+			Exception: For other failures.
+		"""
+		try:
+			trolley_check_query = 'SELECT 1 FROM Trolley WHERE accountID = %s AND lineItemID = %s'
+			if not self._fetch_one(trolley_check_query, (_accountId, _lineItemId)):
+				raise ValueError(f'LineItem ID {_lineItemId} not found in trolley for account ID {_accountId}.')
+
+			trolley_delete_res = self._execute('DELETE FROM Trolley WHERE accountID = %s AND lineItemID = %s', (_accountId, _lineItemId))
+			if trolley_delete_res is None or trolley_delete_res == 0:
+				raise Exception(f'Failed to delete LineItem ID {_lineItemId} from Trolley for account ID {_accountId}.')
+
+			line_item_delete_res = self._execute('DELETE FROM LineItem WHERE lineItemID = %s', (_lineItemId,))
+			if line_item_delete_res is None or line_item_delete_res == 0:
+				raise Exception(f'Failed to delete LineItem ID {_lineItemId} from LineItem table.')
+
+			self.commit()
+			return (trolley_delete_res, line_item_delete_res)
+		except Exception as e:
+			print(f'Error in remove_from_trolley: {e}')
+			self.rollback()
+			raise
+
+	def clear_trolley(self, _accountId: Id, /) -> int:
+		"""
+		Clears all items from an account's trolley.
+		This involves deleting entries from the Trolley table and also deleting the associated LineItems
+		that are not part of any existing order. This is an atomic operation.
+
+		Args:
+			_accountId: The ID of the account whose trolley is to be cleared.
+
+		Returns:
+			The number of LineItems successfully deleted from the LineItem table.
+
+		Raises:
+			Exception: If the operation fails.
+		"""
+		try:
+			trolley_items_query = 'SELECT lineItemID FROM Trolley WHERE accountID = %s'
+			trolley_items_result = self._fetch_all(trolley_items_query, (_accountId,))
+
+			if trolley_items_result is None:
+				raise Exception(f'Failed to fetch trolley items for account {_accountId}.')
+			if not trolley_items_result:
+				return 0
+
+			line_item_ids_in_trolley = [item['lineItemID'] for item in trolley_items_result]
+			placeholders = ', '.join(['%s'] * len(line_item_ids_in_trolley))
+
+			delete_trolley_query = f'DELETE FROM Trolley WHERE accountID = %s AND lineItemID IN ({placeholders})'
+			params_trolley = (_accountId,) + tuple(line_item_ids_in_trolley)
+			trolley_deleted_count = self._execute(delete_trolley_query, params_trolley)
+
+			if trolley_deleted_count is None:
+				raise Exception(f'Error clearing trolley entries for account {_accountId}.')
+
+			delete_line_items_query = f'''
+				DELETE FROM LineItem
+				WHERE lineItemID IN ({placeholders})
+				AND lineItemID NOT IN (SELECT DISTINCT lineItemID FROM OrderItem)
+			'''
+			line_items_deleted_count = self._execute(delete_line_items_query, tuple(line_item_ids_in_trolley))
+
+			if line_items_deleted_count is None:
+				raise Exception(f'Error deleting orphaned line items for account {_accountId} after trolley clear.')
+
+			self.commit()
+			return line_items_deleted_count
+		except Exception as e:
+			print(f'Error in clear_trolley: {e}')
+			self.rollback()
+			raise
 
 	# --- Order Management ---
 
-	def create_order(self, _accountId: int, _addressId: int, _lineItemIds: list[int], /) -> int | None:
+	def create_order(self, _accountId: Id, _addressId: Id, /) -> Id:
 		"""
-		Create a new order with line items.
+		Creates an order for an account using all items currently in their trolley.
+		Sets `priceAtSale` for each line item and moves items from trolley to order.
+		This is an atomic operation.
 
 		Args:
-			_accountId: Account ID
-			_addressId: Address ID for delivery
-			_lineItemIds: list of line item IDs to include in order
+			_accountId: The ID of the account placing the order.
+			_addressId: The ID of the address for the order.
 
 		Returns:
-			Order ID or None on error
+			The orderID of the newly created order.
+
+		Raises:
+			ValueError: If the specified address does not belong to the account,
+						or if the trolley is empty.
+			Exception: If any database operation fails during order creation.
 		"""
-		# Create order
-		order_query = '''
-			INSERT INTO `Order` (accountID, addressID, date)
-			VALUES (%s, %s, %s)
-		'''
-		order_id = self._execute(order_query, (_accountId, _addressId, datetime.now()), _returnLastId=True)
+		try:
+			address_check_query = 'SELECT 1 FROM Address WHERE addressID = %s AND accountID = %s'
+			if not self._fetch_one(address_check_query, (_addressId, _accountId)):
+				raise ValueError(f'Address ID {_addressId} does not belong to account ID {_accountId}.')
 
-		if order_id:
-			# Link line items to order
-			for line_item_id in _lineItemIds:
+			trolley_line_items = self.get_trolley(_accountId)
+			if trolley_line_items is None:
+				raise Exception(f'Error fetching trolley for account {_accountId} during order creation.')
+			if not trolley_line_items:
+				raise ValueError(f'Trolley is empty for account {_accountId}. Cannot create order.')
+
+			for item in trolley_line_items:
+				line_item_id: Id = item['lineItemID']
+				product_id: Id = item['productID']
+				product_info = self.get_product(product_id)
+
+				if not product_info or product_info['price'] is None:
+					raise Exception(f'Could not fetch price for product {product_id}. Aborting order.')
+				current_price = product_info['price']
+
+				update_price_query = 'UPDATE LineItem SET priceAtSale = %s WHERE lineItemID = %s'
+				update_res = self._execute(update_price_query, (current_price, line_item_id))
+				if update_res is None or update_res == 0:
+					raise Exception(f'Failed to update priceAtSale for lineItem {line_item_id}.')
+
+			order_query = '''
+				INSERT INTO `Order` (accountID, addressID, date)
+				VALUES (%s, %s, %s)
+			'''
+			order_id = self._execute(order_query, (_accountId, _addressId, datetime.now()), _returnLastId=True)
+
+			if order_id is None:
+				raise Exception('Failed to create order entry.')
+
+			line_item_ids_in_order: list[Id] = []
+			for item in trolley_line_items:
+				line_item_id: Id = item['lineItemID']
 				link_query = 'INSERT INTO OrderItem (orderID, lineItemID) VALUES (%s, %s)'
-				if not self._execute(link_query, (order_id, line_item_id)):
-					return None
+				link_res = self._execute(link_query, (order_id, line_item_id))
+				if link_res is None or link_res == 0:
+					raise Exception(f'Failed to link lineItem {line_item_id} to order {order_id}.')
+				line_item_ids_in_order.append(line_item_id)
 
+			if line_item_ids_in_order:
+				placeholders = ', '.join(['%s'] * len(line_item_ids_in_order))
+				clear_trolley_query = f'DELETE FROM Trolley WHERE accountID = %s AND lineItemID IN ({placeholders})'
+				params_clear = (_accountId,) + tuple(line_item_ids_in_order)
+				clear_res = self._execute(clear_trolley_query, params_clear)
+
+				# Check if the number of cleared items matches expected
+				if clear_res is None or clear_res != len(line_item_ids_in_order):
+					raise Exception(f'Failed to clear all ordered items from trolley for account {_accountId}. Expected {len(line_item_ids_in_order)}, got {clear_res}.')
+
+			self.commit()
 			return order_id
-
-		return None
+		except Exception as e:
+			print(f'Error in create_order: {e}')
+			self.rollback()
+			raise
 
 	# --- Invoice Management ---
 
-	def save_invoice(self, _accountId: int, _orderId: int, _data: bytes, /) -> int | None:
+	def save_invoice(self, _accountId: Id, _orderId: Id, _data: bytes, /) -> Id:
 		"""
-		Save invoice data.
+		Saves invoice data for an order.
 
 		Args:
-			_accountId: Account ID
-			_orderId: Order ID
-			_data: Invoice data as bytes
+			_accountId: The ID of the account associated with the invoice.
+			_orderId: The ID of the order this invoice is for.
+			_data: The invoice data (e.g., PDF bytes).
 
 		Returns:
-			Invoice ID or None on error
-		"""
-		query = '''
-			INSERT INTO Invoice (accountID, orderID, creationDate, data)
-			VALUES (%s, %s, %s, %s)
-		'''
-		return self._execute(query, (_accountId, _orderId, datetime.now(), _data), _returnLastId=True)
+			The invoiceID of the saved invoice.
 
-	def get_invoice(self, _invoiceId: int, /) -> dict[str, Any] | None:
+		Raises:
+			Exception: If saving fails.
 		"""
-		Retrieve invoice data.
+		query = 'INSERT INTO Invoice (accountID, orderID, creationDate, data) VALUES (%s, %s, %s, %s)'
+		try:
+			invoice_id = self._execute(query, (_accountId, _orderId, datetime.now(), _data), _returnLastId=True)
+			if invoice_id is None:
+				raise Exception('Save invoice failed, no ID returned.')
+			self.commit()
+			return invoice_id
+		except Exception as e:
+			print(f'Error in save_invoice: {e}')
+			self.rollback()
+			raise
+
+	def get_invoice(self, _invoiceId: Id, /) -> DictRow | None:
+		"""
+		Retrieves invoice data by its ID.
 
 		Args:
-			_invoiceId: Invoice ID
+			_invoiceId: The ID of the invoice.
 
 		Returns:
-			Invoice dictionary or None
+			A dictionary containing invoice data, or None if not found or error.
 		"""
 		query = '''
 			SELECT invoiceID, accountID, orderID, creationDate, data
@@ -674,33 +1280,42 @@ class Database:
 
 	# --- Receipt Management ---
 
-	def save_receipt(self, _accountId: int, _orderId: int, _data: bytes, /) -> int | None:
+	def save_receipt(self, _accountId: Id, _orderId: Id, _data: bytes, /) -> Id:
 		"""
-		Save receipt data.
+		Saves receipt data for an order.
 
 		Args:
-			_accountId: Account ID
-			_orderId: Order ID
-			_data: Receipt data as bytes
+			_accountId: The ID of the account associated with the receipt.
+			_orderId: The ID of the order this receipt is for.
+			_data: The receipt data (e.g., PDF bytes).
 
 		Returns:
-			Receipt ID or None on error
-		"""
-		query = '''
-			INSERT INTO Receipt (accountID, orderID, creationDate, data)
-			VALUES (%s, %s, %s, %s)
-		'''
-		return self._execute(query, (_accountId, _orderId, datetime.now(), _data), _returnLastId=True)
+			The receiptID of the saved receipt.
 
-	def get_receipt(self, _receiptId: int, /) -> dict[str, Any] | None:
+		Raises:
+			Exception: If saving fails.
 		"""
-		Retrieve receipt data.
+		query = 'INSERT INTO Receipt (accountID, orderID, creationDate, data) VALUES (%s, %s, %s, %s)'
+		try:
+			receipt_id = self._execute(query, (_accountId, _orderId, datetime.now(), _data), _returnLastId=True)
+			if receipt_id is None:
+				raise Exception('Save receipt failed, no ID returned.')
+			self.commit()
+			return receipt_id
+		except Exception as e:
+			print(f'Error in save_receipt: {e}')
+			self.rollback()
+			raise
+
+	def get_receipt(self, _receiptId: Id, /) -> DictRow | None:
+		"""
+		Retrieves receipt data by its ID.
 
 		Args:
-			_receiptId: Receipt ID
+			_receiptId: The ID of the receipt.
 
 		Returns:
-			Receipt dictionary or None
+			A dictionary containing receipt data, or None if not found or error.
 		"""
 		query = '''
 			SELECT receiptID, accountID, orderID, creationDate, data
@@ -711,32 +1326,41 @@ class Database:
 
 	# --- Report Management ---
 
-	def save_report(self, _creatorId: int, _data: bytes, /) -> int | None:
+	def save_report(self, _creatorId: Id, _data: bytes, /) -> Id:
 		"""
-		Save report data.
+		Saves report data.
 
 		Args:
-			_creatorId: Account ID of report creator
-			_data: Report data as bytes
+			_creatorId: The accountID of the user who created the report.
+			_data: The report data (e.g., PDF or CSV bytes).
 
 		Returns:
-			Report ID or None on error
-		"""
-		query = '''
-			INSERT INTO Report (creator, creationDate, data)
-			VALUES (%s, %s, %s)
-		'''
-		return self._execute(query, (_creatorId, datetime.now(), _data), _returnLastId=True)
+			The reportID of the saved report.
 
-	def get_report(self, _reportId: int, /) -> dict[str, Any] | None:
+		Raises:
+			Exception: If saving fails.
 		"""
-		Retrieve report data.
+		query = 'INSERT INTO Report (creator, creationDate, data) VALUES (%s, %s, %s)'
+		try:
+			report_id = self._execute(query, (_creatorId, datetime.now(), _data), _returnLastId=True)
+			if report_id is None:
+				raise Exception('Save report failed, no ID returned.')
+			self.commit()
+			return report_id
+		except Exception as e:
+			print(f'Error in save_report: {e}')
+			self.rollback()
+			raise
+
+	def get_report(self, _reportId: Id, /) -> DictRow | None:
+		"""
+		Retrieves report data by its ID.
 
 		Args:
-			_reportId: Report ID
+			_reportId: The ID of the report.
 
 		Returns:
-			Report dictionary or None
+			A dictionary containing report data, or None if not found or error.
 		"""
 		query = '''
 			SELECT reportID, creator, creationDate, data
@@ -746,73 +1370,332 @@ class Database:
 		return self._fetch_one(query, (_reportId,))
 
 	# --- Utilities ---
-	def get_enum_values(self, tableName: str, columnName: str) -> list[str]:
+
+	def get_enum_values(self, tableName: str, columnName: str) -> list[str] | None:
 		"""
-		Retrieve the enum values for a specific column in a MariaDB table.
+		Retrieves the possible enum values for a specified column.
 
 		Args:
-			conn: Active mariadb connection.
-			tableName: Name of the table.
-			columnName: Name of the enum column.
+			tableName: The name of the table.
+			columnName: The name of the ENUM column.
 
 		Returns:
-			List of enum values as strings.
-
-		Raises:
-			ValueError if the column is not an ENUM type.
+			A list of string enum values, or None if the column is not found or not an ENUM.
 		"""
-		query = """
+		query = '''
 			SELECT COLUMN_TYPE
 			FROM INFORMATION_SCHEMA.COLUMNS
 			WHERE TABLE_SCHEMA = DATABASE()
 			AND TABLE_NAME = %s
 			AND COLUMN_NAME = %s
-		"""
+		'''
 		result = self._fetch_one(query, (tableName, columnName))
 		if not result:
-			raise ValueError(f"Column `{tableName}` in table `{columnName}` not found.")
-		column_type = result["COLUMN_TYPE"]
-		if not column_type.startswith("enum("):
-			raise ValueError(f"Column `{columnName}` is not an ENUM type.")
+			print(f'Column \'{columnName}\' in table \'{tableName}\' not found.')
+			return None
 
-		enum_str = column_type[5:-1]
+		column_type: str = result['COLUMN_TYPE']
+		if not column_type.lower().startswith('enum('):
+			print(f'Column \'{columnName}\' in table \'{tableName}\' is not an ENUM type. Type: {column_type}')
+			return None
 
-		enum_values = [v.strip("'") for v in enum_str.split(",")]
+		enum_str = column_type[column_type.find('(')+1 : column_type.rfind(')')]
+		enum_values = [val.strip("'") for val in enum_str.split(',')]
 		return enum_values
 
 
 def get_db() -> Generator[Database, None, None]:
 	"""
-	Context manager for database connections.
-
-	Yields:
-		Database instance
+	FastAPI dependency generator for database sessions.
+	Manages connection acquisition and release, and transaction rollback on exceptions.
 	"""
-	raw_conn = None
-	db_instance = None
+	raw_conn: mariadb.Connection | None = None
+	db_instance: Database | None = None
 
 	try:
 		raw_conn = Database.get_connection()
 		db_instance = Database(raw_conn)
 		yield db_instance
-
-	except mariadb.Error as e:
-		print(f"MariaDB error within get_db context: {e}")
+		# If yield was successful and no exceptions, assume commit was handled by methods or not needed.
+		# If an unhandled exception occurs after yield and before finally,
+		# the rollback in the finally block of this function will handle it.
+	except Exception as e: # Catch all exceptions from the route handler or db methods
+		if db_instance:
+			try:
+				db_instance.rollback()
+				print(f'Transaction rolled back due to exception in get_db context: {e}')
+			except Exception as rb_e:
+				print(f'Error during rollback attempt in get_db: {rb_e}')
+		if isinstance(e, HTTPException): # Re-raise HTTPExceptions
+			raise
+		# Wrap other exceptions in HTTPException for consistent error response
 		raise HTTPException(
 			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-			detail=f"A database error occurred during the request: {e}"
+			detail=f'An error occurred: {e}'
 		)
-
-	except HTTPException:
-		raise
-
-	except Exception as e:
-		print(f"Unexpected error in get_db context: {e}")
-		raise HTTPException(
-			status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-			detail=f"An unexpected error occurred: {e}"
-		)
-
 	finally:
 		if db_instance:
 			db_instance.close()
+
+
+class DatabaseTests:
+	"""
+	A class to encapsulate tests for the Database class.
+	"""
+	def __init__(self):
+		print('DatabaseTests initialized. Ensure database schema is applied and server is running.')
+
+	def _run_test_group(self, test_method_group):
+		group_name = test_method_group.__name__
+		print(f'\n--- Running Test Group: {group_name} ---')
+		all_passed = True
+		db_gen = None # Define db_gen outside try to ensure it's available in finally
+		try:
+			db_gen = get_db()
+			db = next(db_gen)
+			try:
+				test_method_group(db)
+				print(f'--- Test Group {group_name} PASSED ---')
+			except AssertionError as ae:
+				all_passed = False
+				print(f'--- Test Group {group_name} FAILED (AssertionError): {ae} ---')
+				import traceback
+				traceback.print_exc()
+			except Exception as e:
+				all_passed = False
+				print(f'--- Test Group {group_name} FAILED (Exception): {e} ---')
+				import traceback
+				traceback.print_exc()
+		except Exception as e: # Catches errors from get_db() or next(db_gen)
+			all_passed = False
+			print(f'--- Test Group {group_name} FAILED (Error in get_db setup or yield): {e} ---')
+			import traceback
+			traceback.print_exc()
+		finally:
+			if db_gen: # Ensure db_gen was initialized before trying to call next
+				try:
+					next(db_gen, None) # Ensure finally in get_db is called
+				except StopIteration:
+					pass # Expected if generator already exhausted
+				except Exception as e_fin:
+					print(f'Error during get_db cleanup for {group_name}: {e_fin}')
+					all_passed = False # Mark as failed if cleanup has issues
+		return all_passed
+
+	def test_utility_functions(self, db: Database):
+		print('Testing: get_enum_values')
+		account_statuses = db.get_enum_values('Account', 'status')
+		print(f'Account statuses: {account_statuses}')
+		assert account_statuses is not None and 'active' in account_statuses, 'Failed to get active status'
+		account_roles = db.get_enum_values('Account', 'role')
+		print(f'Account roles: {account_roles}')
+		assert account_roles is not None and 'customer' in account_roles, 'Failed to get customer role'
+
+	def test_account_crud_operations(self, db: Database):
+		print('Testing: Account CRUD')
+		test_email = f'acc_test_{datetime.now().timestamp()}@example.com'
+		# Create
+		acc_id = db.create_account(test_email, 'password', Role.CUSTOMER, _firstName='Acc', _lastName='Test')
+		assert isinstance(acc_id, int), 'create_account failed'
+		# Read (single)
+		acc = db.get_account(_accountId=acc_id)
+		assert acc is not None and acc['email'] == test_email, 'get_account failed'
+		# Read (multiple)
+		all_specific_accounts = db.get_accounts(_role=Role.CUSTOMER, _status=Status.UNVERIFIED)
+		assert all_specific_accounts is not None and any(a['accountID'] == acc_id for a in all_specific_accounts), 'get_accounts failed to find new account with specific role/status'
+		# Update
+		db.update_account(acc_id, firstname='UpdatedAcc', status=Status.ACTIVE.value)
+		updated_acc = db.get_account(_accountId=acc_id)
+		assert updated_acc is not None and updated_acc['firstname'] == 'UpdatedAcc' and updated_acc['status'] == Status.ACTIVE.value, 'update_account failed'
+		# Delete
+		db.delete_accounts({acc_id})
+		assert db.get_account(_accountId=acc_id) is None, 'delete_accounts failed'
+
+	def test_address_crud_operations(self, db: Database):
+		print('Testing: Address CRUD')
+		acc_id = db.create_account(f'addr_test_{datetime.now().timestamp()}@example.com', 'pw')
+		# Create
+		addr_id = db.create_address(acc_id, '123 Test Lane')
+		assert isinstance(addr_id, int), 'create_address failed'
+		# Read
+		addresses = db.get_addresses(acc_id)
+		assert addresses is not None and len(addresses) == 1 and addresses[0]['location'] == '123 Test Lane', 'get_addresses failed'
+		# Modify
+		db.modify_address(addr_id, '456 New Road')
+		mod_addresses = db.get_addresses(acc_id)
+		assert mod_addresses is not None and mod_addresses[0]['location'] == '456 New Road', 'modify_address failed'
+		# Delete
+		db.delete_address(addr_id)
+		assert not db.get_addresses(acc_id), 'delete_address failed'
+		db.delete_accounts({acc_id})
+
+	def test_product_crud_and_features(self, db: Database):
+		print('Testing: Product CRUD and features')
+		prod_name = f'Prod_Test_{datetime.now().timestamp()}'
+		# Add
+		prod_id = db.add_product(prod_name, 'Desc', 10.0, _stock=10, _available=5)
+		assert isinstance(prod_id, int), 'add_product failed'
+		# Get
+		prod = db.get_product(prod_id)
+		assert prod is not None and prod['name'] == prod_name, 'get_product failed'
+		# Update
+		db.update_product(prod_id, description='New Desc', price=12.50)
+		updated_prod = db.get_product(prod_id)
+		assert updated_prod is not None and updated_prod['description'] == 'New Desc' and updated_prod['price'] == 12.50, 'update_product failed'
+		# Set discontinued
+		db.set_product_discontinued(prod_id, True)
+		disc_prod = db.get_product(prod_id)
+		assert disc_prod is not None and disc_prod['discontinued'] == 1, 'set_product_discontinued failed (True)'
+		db.set_product_discontinued(prod_id, False)
+		not_disc_prod = db.get_product(prod_id)
+		assert not_disc_prod is not None and not_disc_prod['discontinued'] == 0, 'set_product_discontinued failed (False)'
+		# Get all products (basic check)
+		all_prods = db.get_products()
+		assert all_prods is not None and any(p['productID'] == prod_id for p in all_prods), "Failed to get all products or find test product"
+
+	def test_tag_crud_and_product_linking(self, db: Database):
+		print('Testing: Tag CRUD and Product Linking')
+		tag_name1 = f'Tag1_Test_{datetime.now().timestamp()}'
+		tag_name2 = f'Tag2_Test_{datetime.now().timestamp()}'
+		# Create
+		tag1_id = db.create_tag(tag_name1)
+		tag2_id = db.create_tag(tag_name2)
+		assert isinstance(tag1_id, int) and isinstance(tag2_id, int), 'create_tag failed'
+		# Get ID by name
+		assert db.get_tag_id(tag_name1) == tag1_id, 'get_tag_id failed for tag1'
+		assert db.get_tag_id('NonExistentTag') is None, 'get_tag_id returned ID for non-existent tag'
+		# Get all tags
+		all_tags = db.get_all_tags()
+		assert all_tags is not None and any(t['tagID'] == tag1_id for t in all_tags) and any(t['tagID'] == tag2_id for t in all_tags), 'get_all_tags failed'
+		# Product linking
+		prod_id = db.add_product(f'TagLinkProd_{datetime.now().timestamp()}', 'Desc')
+		db.add_tag_to_product(prod_id, tag1_id)
+		db.add_tag_to_product(prod_id, tag2_id)
+		# Verify link with get_products and get_products_with_tagIDs
+		prods_by_name = db.get_products([tag_name1, tag_name2])
+		assert prods_by_name is not None and any(p['productID'] == prod_id for p in prods_by_name), 'get_products by name failed'
+		prods_by_id = db.get_products_with_tagIDs({tag1_id, tag2_id})
+		assert prods_by_id is not None and any(p['productID'] == prod_id for p in prods_by_id), 'get_products_with_tagIDs failed'
+		# Remove link
+		db.remove_tag_from_product(prod_id, tag1_id)
+		prods_after_remove = db.get_products_with_tagIDs({tag1_id, tag2_id}) # Should not find it now
+		assert not any(p['productID'] == prod_id for p in prods_after_remove or []), 'Product still found after removing one of required tags'
+		try:
+			db.remove_tag_from_product(prod_id, tag1_id) # Try removing again
+			assert False, 'Should have raised ValueError for removing non-existent tag link'
+		except ValueError:
+			pass
+		# Delete tag
+		db.delete_tag(tag1_id)
+		db.delete_tag(tag2_id)
+		assert db.get_tag_id(tag_name1) is None and db.get_tag_id(tag_name2) is None, 'delete_tag failed'
+
+	def test_image_crud_and_product_linking(self, db: Database):
+		print('Testing: Image CRUD and Product Linking')
+		prod_id = db.add_product(f'ImageLinkProd_{datetime.now().timestamp()}', 'Desc')
+		img_url = f'http://example.com/img_{datetime.now().timestamp()}.jpg'
+		# Add image to product
+		img_id = db.add_image_to_product(img_url, prod_id)
+		assert isinstance(img_id, int), 'add_image_to_product failed'
+		# Get product images
+		prod_images = db.get_product_images(prod_id)
+		assert prod_images is not None and img_url in prod_images, 'get_product_images failed'
+		# Delete image
+		db.delete_image(img_id)
+		# Check if image is gone from Image table
+		img_check = db._fetch_one('SELECT 1 FROM Image WHERE imageID = %s', (img_id,))
+		assert img_check is None, 'Image not deleted from Image table'
+		# Check if association is gone from Product-Image (due to cascade)
+		img_assoc_check = db._fetch_one('SELECT 1 FROM `Product-Image` WHERE imageID = %s', (img_id,))
+		assert img_assoc_check is None, 'Product-Image association not cascade deleted'
+		assert not db.get_product_images(prod_id), 'get_product_images still finds images after delete_image'
+
+	def test_trolley_lineitem_order_workflow(self, db: Database):
+		print('Testing: Full Trolley-Order Workflow')
+		acc_id = db.create_account(f'workflow_user_{datetime.now().timestamp()}@example.com', 'pw')
+		addr_id = db.create_address(acc_id, '1 Workflow St')
+		prod1_id = db.add_product('WorkflowProd1', 'P1', 10.0, _stock=10, _available=10)
+		prod2_id = db.add_product('WorkflowProd2', 'P2', 20.0, _stock=10, _available=10)
+
+		li1_id = db.add_to_trolley(acc_id, prod1_id, _quantity=2)
+		db.add_to_trolley(acc_id, prod2_id, _quantity=1)
+		trolley = db.get_trolley(acc_id)
+		assert trolley is not None and len(trolley) == 2, 'Trolley setup incorrect'
+
+		db.change_quantity_of_product_in_trolley(acc_id, prod1_id, 3)
+		changed_trolley = db.get_trolley(acc_id)
+		assert changed_trolley is not None and any(item['productID'] == prod1_id and item['quantity'] == 3 for item in changed_trolley), 'change_quantity failed'
+
+		order_id = db.create_order(acc_id, addr_id)
+		assert isinstance(order_id, int), 'create_order failed'
+		assert not db.get_trolley(acc_id), 'Trolley not cleared after order'
+
+		order_items_check = db._fetch_all('SELECT li.productID, li.quantity, li.priceAtSale FROM OrderItem oi JOIN LineItem li ON oi.lineItemID = li.lineItemID WHERE oi.orderID = %s ORDER BY li.productID', (order_id,))
+		assert order_items_check is not None and len(order_items_check) == 2, 'Incorrect number of items in order'
+		assert order_items_check[0]['productID'] == prod1_id and order_items_check[0]['quantity'] == 3 and order_items_check[0]['priceAtSale'] == 10.0
+		assert order_items_check[1]['productID'] == prod2_id and order_items_check[1]['quantity'] == 1 and order_items_check[1]['priceAtSale'] == 20.0
+
+		li3_id = db.add_to_trolley(acc_id, prod1_id, _quantity=1)
+		db.remove_from_trolley(acc_id, li3_id)
+		assert not db.get_trolley(acc_id), 'remove_from_trolley failed'
+
+		db.add_to_trolley(acc_id, prod1_id, _quantity=1)
+		db.add_to_trolley(acc_id, prod2_id, _quantity=1)
+		assert len(db.get_trolley(acc_id) or []) == 2
+		cleared_count = db.clear_trolley(acc_id)
+		assert cleared_count == 2, 'clear_trolley returned incorrect count'
+		assert not db.get_trolley(acc_id), 'clear_trolley did not empty trolley'
+
+	def test_financial_document_management(self, db: Database):
+		print('Testing: Invoice, Receipt, Report Management')
+		acc_id = db.create_account(f'docs_user_{datetime.now().timestamp()}@example.com', 'pw')
+		addr_id = db.create_address(acc_id, '1 Docs St')
+		prod_id = db.add_product('DocsProd', 'P', 1.0, _stock=1, _available=1)
+		db.add_to_trolley(acc_id, prod_id, _quantity=1)
+		order_id = db.create_order(acc_id, addr_id)
+
+		invoice_data = b'Test Invoice Data'
+		inv_id = db.save_invoice(acc_id, order_id, invoice_data)
+		assert isinstance(inv_id, int), 'save_invoice failed'
+		inv = db.get_invoice(inv_id)
+		assert inv is not None and inv['data'] == invoice_data, 'get_invoice failed'
+
+		receipt_data = b'Test Receipt Data'
+		rec_id = db.save_receipt(acc_id, order_id, receipt_data)
+		assert isinstance(rec_id, int), 'save_receipt failed'
+		rec = db.get_receipt(rec_id)
+		assert rec is not None and rec['data'] == receipt_data, 'get_receipt failed'
+
+		report_data = b'Test Report Data'
+		rep_id = db.save_report(acc_id, report_data)
+		assert isinstance(rep_id, int), 'save_report failed'
+		rep = db.get_report(rep_id)
+		assert rep is not None and rep['data'] == report_data and rep['creator'] == acc_id, 'get_report failed'
+
+	def run_all_tests(self):
+		"""Runs all defined test methods."""
+		tests_to_run = [
+			self.test_utility_functions,
+			self.test_account_crud_operations,
+			self.test_address_crud_operations,
+			self.test_product_crud_and_features,
+			self.test_tag_crud_and_product_linking,
+			self.test_image_crud_and_product_linking,
+			self.test_trolley_lineitem_order_workflow,
+			self.test_financial_document_management,
+		]
+		overall_success = True
+		for test_method_group in tests_to_run:
+			if not self._run_test_group(test_method_group):
+				overall_success = False
+
+		if overall_success:
+			print('\n--- ALL TESTS PASSED SUCCESSFULLY ---')
+		else:
+			print('\n--- !!! SOME TESTS FAILED !!! ---')
+
+
+if __name__ == '__main__':
+	Database.initialize_pool()
+	test_runner = DatabaseTests()
+	test_runner.run_all_tests()
