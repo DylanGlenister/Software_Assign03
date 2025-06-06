@@ -1,7 +1,7 @@
 function initEmployee() {
     document.getElementById('createProductForm')?.addEventListener('submit', handleCreateProduct);
     document.getElementById('updateProductForm')?.addEventListener('submit', handleUpdateProduct);
-    
+
     document.getElementById('getAllOrdersBtn')?.addEventListener('click', getAllOrders);
 
     document.getElementById('createTagForm')?.addEventListener('submit', handleCreateTag);
@@ -21,15 +21,15 @@ function populateProductDropdowns() {
     setSelectOptions({
         endpoint: '/catalogue/all',
         elements: [
-            'updateProductId_ProductSelect', 
-            'addProductTag_ProductId_ProductSelect', 
+            'updateProductId_ProductSelect',
+            'addProductTag_ProductId_ProductSelect',
             'removeProductTag_ProductId_ProductSelect',
             'addProductImage_ProductId_ProductSelect'
         ],
         label: 'Select product',
-        key: '', 
+        key: '',
         errorMessage: 'Could not get products list.',
-        requireAuth: true, 
+        requireAuth: true,
         nameKey: "name",
         idKey: "productID"
     });
@@ -47,7 +47,7 @@ function populateTagDropdowns() {
         key: '',
         errorMessage: 'Could not get tags list. Ensure you are logged in.',
         requireAuth: true,
-        nameKey: "name", 
+        nameKey: "name",
         idKey: "tagID"
     });
 }
@@ -98,7 +98,7 @@ async function handleUpdateProduct(e) {
     if (stockString) payload.stock = parseInt(stockString);
     if (availableString) payload.available = parseInt(availableString);
     if (discontinuedString !== "") payload.discontinued = (discontinuedString === "true");
-    
+
     if (Object.keys(payload).length === 0) {
         showNotification('Please provide at least one field to update.', 'info');
         setFormLoading('updateProductForm', false); return;
@@ -111,7 +111,7 @@ async function handleUpdateProduct(e) {
         showNotification('Product updated successfully!', 'success');
         document.getElementById('updateProductForm').reset();
         document.getElementById('updateProductId_ProductSelect').value = "";
-        populateProductDropdowns(); 
+        populateProductDropdowns();
     } else {
         showNotification(response.data?.detail || 'Failed to update product!', 'error');
     }
@@ -175,7 +175,7 @@ async function handleDeleteTag(e) {
     setFormLoading('deleteTagForm', false);
 }
 
-// --- Product-Tag Handlers ---
+// --- ProductTag Handlers ---
 async function handleAddTagToProduct(e) {
     e.preventDefault();
     setFormLoading('addProductTagForm', true);
