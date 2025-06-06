@@ -1,4 +1,4 @@
-let API_BASE_URL = 'https://erik-running-studios-southampton.trycloudflare.com/api/v1/endpoints';
+let API_BASE_URL = 'http://localhost:8000/api/v1/endpoints';
 let AUTH_TOKEN = null; 
 let CURRENT_USER_ROLE = null;
 

@@ -410,7 +410,7 @@ class Database:
         Args:
                 accountID: The ID of the account to update.
                 fields: Keyword arguments where keys are column names and values are the new values.
-                                 Allowed fields: 'email', 'password', 'firstname', 'lastname', 'role', 'status'.
+                    Allowed fields: 'email', 'password', 'firstname', 'lastname', 'role', 'status'.
 
         Returns:
                 The number of affected rows.
