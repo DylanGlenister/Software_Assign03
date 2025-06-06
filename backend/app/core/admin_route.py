@@ -3,15 +3,14 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 from ..models.admin import AdminAccount
-from ..core.database import Database, get_db, Role, Status
+from ..core.database import Role, Status
 from ..utils.token import get_account_data
 from ..utils.settings import SETTINGS
 
 admin_route = APIRouter(prefix=SETTINGS.api_path + "/admin", tags=["admin"])
 
 
-def get_admin_account(account_data: dict = Depends(
-        get_account_data)) -> AdminAccount:
+def get_admin_account(account_data: dict = Depends(get_account_data)) -> AdminAccount:
     account = AdminAccount(**account_data)
     if not account.verify_perms([Role.ADMIN]):
         raise HTTPException(
@@ -49,11 +48,10 @@ class DeleteOldAccountsPayload(BaseModel):
 @admin_route.post("/createAccount")
 def create_account_route(
     payload: AdminCreateAccountPayload,
-    db: Database = Depends(get_db),
     admin: AdminAccount = Depends(get_admin_account),
 ):
     try:
-        admin.create_account(db, payload.role, payload.email, payload.password)
+        admin.create_account(payload.role, payload.email, payload.password)
     except HTTPException:
         raise
 
@@ -63,12 +61,10 @@ def create_account_route(
 @admin_route.put("/changeOthersPassword")
 def change_others_password_route(
     payload: ChangeOthersPasswordPayload,
-    db: Database = Depends(get_db),
     admin: AdminAccount = Depends(get_admin_account),
 ):
     try:
-        admin.change_others_password(
-            db, payload.newPassword, payload.accountID)
+        admin.change_others_password(payload.newPassword, payload.accountID)
     except HTTPException:
         raise
 
@@ -78,11 +74,10 @@ def change_others_password_route(
 @admin_route.put("/deactivateAccount")
 def deactivate_account_route(
     payload: DeactivateAccountPayload,
-    db: Database = Depends(get_db),
     admin: AdminAccount = Depends(get_admin_account),
 ):
     try:
-        admin.deactivate_account(db, payload.accountID)
+        admin.deactivate_account(payload.accountID)
     except HTTPException:
         raise
 
@@ -92,12 +87,11 @@ def deactivate_account_route(
 @admin_route.delete("/deleteAccount")
 def delete_account_route(
     payload: DeleteAccountPayload,
-    db: Database = Depends(get_db),
     admin: AdminAccount = Depends(get_admin_account),
 ):
     try:
-        targetAccount = admin.get_account(db, payload.accountID)
-        admin.delete_accounts(db, [targetAccount.get("accountID")])
+        targetAccount = admin.get_account(payload.accountID)
+        admin.delete_accounts([targetAccount.get("accountID")])
     except HTTPException:
         raise
 
@@ -106,27 +100,23 @@ def delete_account_route(
 
 @admin_route.get("/accounts")
 def get_all_accounts_route(
-        db: Database = Depends(get_db),
-        admin: AdminAccount = Depends(get_admin_account)):
+    admin: AdminAccount = Depends(get_admin_account)
+):
     try:
-        accounts = admin.get_all_accounts(db)
+        accounts = admin.get_all_accounts()
     except HTTPException:
         raise
 
-    return {
-        "message": "Accounts were successfully retrieved",
-        "accounts": accounts}
+    return {"message": "Accounts were successfully retrieved", "accounts": accounts}
 
 
 @admin_route.delete("/deleteAccounts")
 def delete_old_accounts_route(
     payload: DeleteOldAccountsPayload,
-    db: Database = Depends(get_db),
     admin: AdminAccount = Depends(get_admin_account),
 ):
     try:
         accounts = admin.get_all_accounts(
-            db,
             {
                 "olderThan": payload.daysOld,
                 "role": payload.role,
@@ -142,7 +132,7 @@ def delete_old_accounts_route(
         for account in accounts:
             ids.append(account.get("accountID"))
 
-        admin.delete_accounts(db, ids)
+        admin.delete_accounts(ids)
 
         return {
             "message": f"Successfully deleted {len(ids)} accounts",

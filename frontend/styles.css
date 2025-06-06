@@ -155,6 +155,7 @@ body {
 .method-get { background: #007bff; color: white; }
 .method-put { background: #ffc107; color: #212529; }
 .method-delete { background: #dc3545; color: white; }
+.method-patch { background: #35c9dc; color: white; }
 
 .endpoint-body {
     margin: 3px 20px 3px 20px;

@@ -8,10 +8,7 @@ from ..utils.settings import SETTINGS
 from ..utils.token import create_token, get_account_data
 from .database import Database, Role, Status, get_db
 
-account_route = APIRouter(
-    prefix=SETTINGS.api_path +
-    "/accounts",
-    tags=["accounts"])
+account_route = APIRouter(prefix=SETTINGS.api_path + "/accounts", tags=["accounts"])
 
 
 class LoginPayload(BaseModel):
@@ -36,8 +33,7 @@ def get_account(account_data: dict = Depends(get_account_data)) -> Account:
 
 @account_route.post("/login")
 def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
-    account: Account | None = Account.login(
-        db, payload.email, payload.password)
+    account: Account | None = Account.login(db, payload.email, payload.password)
 
     if not account:
         return {"message": "Invalid credentials"}
@@ -65,7 +61,6 @@ def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
 def update_account(
     payload: UpdateAccountPayload,
     account: Account = Depends(get_account),
-    db: Database = Depends(get_db),
 ):
     # TODO This never gets reached somehow
     print("Ping")
@@ -76,7 +71,7 @@ def update_account(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Guests cannot update their accounts. Please log in",
         )
-    result = account.update_info(db, **payload.model_dump(exclude_unset=True))
+    result = account.update_info(**payload.model_dump(exclude_unset=True))
     if isinstance(result, dict) and result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     return {"message": "Account updated successfully"}
@@ -86,7 +81,6 @@ def update_account(
 def change_password(
     payload: ChangePasswordPayload,
     account: Account = Depends(get_account),
-    db: Database = Depends(get_db),
 ):
     if account.verify_perms(
         [Role.GUEST], True
@@ -97,11 +91,9 @@ def change_password(
         )
 
     try:
-        result = account.change_password(db, payload.new_password)
+        result = account.change_password(payload.new_password)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     if not result:
         raise HTTPException(

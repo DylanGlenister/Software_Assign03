@@ -20,7 +20,9 @@ class Account:
         password: str | None,
         firstname: str | None,
         lastname: str | None,
+        db: Database
     ):
+        self.db: Database = db
         self.accountID: int = accountID
         self.creationDate: str = creationDate
         self.role: Role = role
@@ -46,9 +48,7 @@ class Account:
             print("No account found with that email.")
             return None
 
-        if checkpw(
-                password.encode("utf-8"),
-                account["password"].encode("utf-8")):
+        if checkpw(password.encode("utf-8"), account["password"].encode("utf-8")):
             return cls(
                 accountID=account["accountID"],
                 email=account["email"],
@@ -58,6 +58,7 @@ class Account:
                 creationDate=account["creationDate"],
                 role=account["role"],
                 status=account["status"],
+                db=db
             )
         else:
             print(f"Password '${password}' is incorrect.")
@@ -71,26 +72,20 @@ class Account:
             errors.append("Password must be at least 8 characters long.")
 
         if not any(char.isupper() for char in password):
-            errors.append(
-                "Password must contain at least one uppercase letter.")
+            errors.append("Password must contain at least one uppercase letter.")
 
         if not any(char.islower() for char in password):
-            errors.append(
-                "Password must contain at least one lowercase letter.")
+            errors.append("Password must contain at least one lowercase letter.")
 
         if not any(char.isdigit() for char in password):
             errors.append("Password must contain at least one digit.")
 
         if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-            errors.append(
-                "Password must contain at least one special character.")
+            errors.append("Password must contain at least one special character.")
 
         return errors
 
-    def verify_perms(
-            self,
-            required_roles: list[Role],
-            inverse: bool = False) -> bool:
+    def verify_perms(self, required_roles: list[Role], inverse: bool = False) -> bool:
         """
         Check if the user's role matches the required roles.
 
@@ -107,7 +102,7 @@ class Account:
 
         return user in required_roles
 
-    def update_info(self, db: Database, **fields) -> dict:
+    def update_info(self, **fields) -> dict:
         filtered_fields = filter_dict(
             fields, {"email", "status", "firstname", "lastname"}
         )
@@ -117,8 +112,7 @@ class Account:
 
         if "email" in filtered_fields:
             try:
-                filtered_fields["email"] = str(
-                    filtered_fields["email"].strip().lower())
+                filtered_fields["email"] = str(filtered_fields["email"].strip().lower())
             except ValidationError:
                 return {"error": "Invalid email format."}
 
@@ -128,27 +122,21 @@ class Account:
             except ValidationError:
                 raise ValidationError(["Status does not exist"])
 
-        success: bool = bool(
-            db.update_account(
-                self.accountID,
-                **filtered_fields))
+        success: bool = bool(self.db.update_account(self.accountID, **filtered_fields))
 
         if success:
             for key, value in filtered_fields.items():
                 setattr(self, key, value)
         return {"success": success}
 
-    def change_password(self, db: Database, new_password: str) -> bool:
+    def change_password(self, new_password: str) -> bool:
         errors = self.verify_password(new_password)
         if errors:
             raise ValueError("\n".join(errors))
 
         try:
             hashed: str = self._hash_password(new_password)
-            success: bool = bool(
-                db.update_account(
-                    self.accountID,
-                    password=hashed))
+            success: bool = bool(self.db.update_account(self.accountID, password=hashed))
 
             if not success:
                 raise RuntimeError("Failed to update password in database")

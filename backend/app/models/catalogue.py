@@ -56,7 +56,7 @@ class Catalogue:
 
         images = self.db.get_product_images(product_id) or []
         tags_data = self.db.get_tags_for_product(product_id) or []
-        tags = [tag['name'] for tag in tags_data]
+        tags = [tag["name"] for tag in tags_data]
 
         # Combine all data and validate against the Pydantic model.
         full_product_data = {
@@ -131,9 +131,11 @@ class Catalogue:
         matching_products: list[Product] = []
 
         for product in all_products:
-            if (search_term_lower in product.name.lower() or
-                    search_term_lower in product.description.lower() or
-                    any(search_term_lower in tag.lower() for tag in product.tags)):
+            if (
+                search_term_lower in product.name.lower()
+                or search_term_lower in product.description.lower()
+                or any(search_term_lower in tag.lower() for tag in product.tags)
+            ):
                 matching_products.append(product)
 
         return matching_products
@@ -163,7 +165,9 @@ class Catalogue:
 
         new_product = self.get_product_by_id(product_id)
         if not new_product:
-            raise ValueError(f"Failed to retrieve newly created product with ID: {product_id}")
+            raise ValueError(
+                f"Failed to retrieve newly created product with ID: {product_id}"
+            )
 
         return new_product
 

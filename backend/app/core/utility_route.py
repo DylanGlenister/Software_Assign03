@@ -9,10 +9,7 @@ from .database import Database, get_db
 from ..utils.settings import SETTINGS
 from ..utils.token import decode_token, get_token, TokenData
 
-utility_route = APIRouter(
-    prefix=SETTINGS.api_path +
-    "/utility",
-    tags=["utility"])
+utility_route = APIRouter(prefix=SETTINGS.api_path + "/utility", tags=["utility"])
 
 bearer_scheme = HTTPBearer()
 
@@ -122,8 +119,7 @@ class PasswordRequest(BaseModel):
     password: str
 
 
-@utility_route.post("/hashPassword",
-                    summary="Hash a password using the Account model")
+@utility_route.post("/hashPassword", summary="Hash a password using the Account model")
 def hash_password(data: PasswordRequest):
     if not data.password or len(data.password.strip()) == 0:
         raise HTTPException(status_code=400, detail="Password cannot be empty")

@@ -19,85 +19,68 @@ class Product(BaseModel):
     """
     Represents a product with all its details, intended for API responses.
     """
+
     product_id: Annotated[
         int,
         Field(
             ...,
             alias="productID",
             description="The unique identifier for the product.",
-            gt=0
-        )
+            gt=0,
+        ),
     ]
     name: Annotated[
         str,
         Field(
-            ...,
-            description="The name of the product.",
-            min_length=1,
-            max_length=255
-        )
+            ..., description="The name of the product.", min_length=1, max_length=255
+        ),
     ]
     description: Annotated[
-        str,
-        Field(
-            default="",
-            description="A detailed description of the product."
-        )
+        str, Field(default="", description="A detailed description of the product.")
     ]
     price: Annotated[
-        PositiveFloat,
-        Field(
-            ...,
-            description="The selling price of the product."
-        )
+        PositiveFloat, Field(..., description="The selling price of the product.")
     ]
     stock: Annotated[
         NonNegativeInt,
-        Field(
-            ...,
-            description="The total quantity of the product in stock."
-        )
+        Field(..., description="The total quantity of the product in stock."),
     ]
     available_for_sale: Annotated[
         NonNegativeInt,
         Field(
             ...,
             alias="available",
-            description="The quantity of the product available for immediate sale."
-        )
+            description="The quantity of the product available for immediate sale.",
+        ),
     ]
     discontinued: Annotated[
-        bool,
-        Field(
-            ...,
-            description="Indicates if the product is discontinued."
-        )
+        bool, Field(..., description="Indicates if the product is discontinued.")
     ]
     created_date: Annotated[
         datetime,
         Field(
             ...,
             alias="creationDate",
-            description="The date and time when the product was created."
-        )
+            description="The date and time when the product was created.",
+        ),
     ]
     tags: Annotated[
         list[str],
         Field(
             default_factory=list,
-            description="A list of tags associated with the product."
-        )
+            description="A list of tags associated with the product.",
+        ),
     ]
     images: Annotated[
         list[str],
         Field(
-            default_factory=list,
-            description="A list of image URLs for the product."
-        )
+            default_factory=list, description="A list of image URLs for the product."
+        ),
     ]
 
     class Config:
         """Pydantic model configuration."""
+
         populate_by_name = True
         from_attributes = True
 
@@ -109,47 +92,35 @@ class ProductCreate(BaseModel):
     """
     Defines the required fields for creating a new product.
     """
+
     name: Annotated[
         str,
         Field(
-            ...,
-            description="The name of the product.",
-            min_length=1,
-            max_length=255
-        )
+            ..., description="The name of the product.", min_length=1, max_length=255
+        ),
     ]
     description: Annotated[
-        str,
-        Field(
-            default="",
-            description="A detailed description of the product."
-        )
+        str, Field(default="", description="A detailed description of the product.")
     ]
     price: Annotated[
-        PositiveFloat,
-        Field(
-            ...,
-            description="The selling price of the product."
-        )
+        PositiveFloat, Field(..., description="The selling price of the product.")
     ]
     stock: Annotated[
         NonNegativeInt,
-        Field(
-            default=0,
-            description="The initial quantity of the product in stock."
-        )
+        Field(default=0, description="The initial quantity of the product in stock."),
     ]
     available_for_sale: Annotated[
         NonNegativeInt,
         Field(
             default=0,
             alias="available",
-            description="The initial quantity available for sale."
-        )
+            description="The initial quantity available for sale.",
+        ),
     ]
 
     class Config:
         """Pydantic model configuration."""
+
         populate_by_name = True
 
 
@@ -160,52 +131,44 @@ class ProductUpdate(BaseModel):
     Defines the fields that can be updated for an existing product.
     All fields are optional.
     """
+
     name: Annotated[
         str | None,
         Field(
             default=None,
             description="The new name of the product.",
             min_length=1,
-            max_length=255
-        )
+            max_length=255,
+        ),
     ]
     description: Annotated[
         str | None,
-        Field(
-            default=None,
-            description="The new description of the product."
-        )
+        Field(default=None, description="The new description of the product."),
     ]
     price: Annotated[
         PositiveFloat | None,
-        Field(
-            default=None,
-            description="The new selling price of the product."
-        )
+        Field(default=None, description="The new selling price of the product."),
     ]
     stock: Annotated[
         NonNegativeInt | None,
         Field(
-            default=None,
-            description="The new total quantity of the product in stock."
-        )
+            default=None, description="The new total quantity of the product in stock."
+        ),
     ]
     available_for_sale: Annotated[
         NonNegativeInt | None,
         Field(
             default=None,
             alias="available",
-            description="The new quantity available for sale."
-        )
+            description="The new quantity available for sale.",
+        ),
     ]
     discontinued: Annotated[
         bool | None,
-        Field(
-            default=None,
-            description="The new discontinued status of the product."
-        )
+        Field(default=None, description="The new discontinued status of the product."),
     ]
 
     class Config:
         """Pydantic model configuration."""
+
         populate_by_name = True

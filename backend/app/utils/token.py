@@ -82,8 +82,8 @@ def get_account_data(
     token_data = decode_token(token)
     if not token_data:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token")
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token"
+        )
 
     account_data = db.get_account(accountId=token_data.accountID)
     if not account_data:
@@ -91,4 +91,5 @@ def get_account_data(
             status_code=status.HTTP_404_NOT_FOUND, detail="Account not found"
         )
 
+    account_data["db"] = db
     return account_data

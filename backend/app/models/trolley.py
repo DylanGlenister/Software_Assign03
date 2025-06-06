@@ -18,20 +18,18 @@ class Trolley:
                 return self.db.change_quantity_of_product_in_trolley(
                     self.accountID, productID, lineItem["quantity"]
                 )
-                
+
         if self.db.add_to_trolley(self.accountID, productID, quantity):
             self.lineItems = self.db.get_trolley(self.accountID)
             return True
-        
+
         return False
-        
 
     def update_quantity(self, productID: int, newQuantity: int):
         for item in self.get_items():
             if item["productID"] == productID:
                 if newQuantity <= 0:
-                    self.db.remove_from_trolley(
-                        self.accountID, item["lineItemID"])
+                    self.db.remove_from_trolley(self.accountID, item["lineItemID"])
                 else:
                     self.db.change_quantity_of_product_in_trolley(
                         self.accountID, productID, newQuantity
@@ -43,8 +41,7 @@ class Trolley:
     def remove_from_trolley(self, product_id: int):
         for lineItem in self.get_items():
             if lineItem["productID"] == product_id:
-                self.db.remove_from_trolley(
-                    self.accountID, lineItem["lineItemID"])
+                self.db.remove_from_trolley(self.accountID, lineItem["lineItemID"])
                 self.lineItems.remove(lineItem)
                 return
         return "Failed to find"

@@ -1,10 +1,9 @@
 from typing import Optional
 from pydantic import EmailStr
-from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 
 from .account import Account
-from ..core.database import Database, Role, Status
+from ..core.database import Role, Status
 
 
 class AdminAccount(Account):
@@ -18,7 +17,7 @@ class AdminAccount(Account):
         super().__init__(*args, **kwargs)
 
     def change_others_password(
-        self, db: Database, new_password: str, account_id: int
+        self, new_password: str, account_id: int
     ) -> None:
         """Change another user's password with admin privileges.
 
@@ -33,11 +32,11 @@ class AdminAccount(Account):
         """
         if errors := self.verify_password(new_password):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=str(errors))
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(errors)
+            )
 
         hashed_password = self._hash_password(new_password)
-        if not db.update_account(account_id, password=hashed_password):
+        if not self.db.update_account(account_id, password=hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to update password for account {account_id}",
@@ -46,7 +45,7 @@ class AdminAccount(Account):
         self.password = hashed_password
 
     def create_account(
-        self, db: Database, role: Role, email: EmailStr, password: str
+        self, role: Role, email: EmailStr, password: str
     ) -> int:
         """Create a new user account with admin privileges.
 
@@ -64,7 +63,7 @@ class AdminAccount(Account):
             HTTPException: 422 if password invalid
             HTTPException: 500 if creation fails
         """
-        if db.get_account(email=email.lower().strip()):
+        if self.db.get_account(email=email.lower().strip()):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Account with email {email} already exists",
@@ -72,10 +71,10 @@ class AdminAccount(Account):
 
         if errors := self.verify_password(password):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=str(errors))
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(errors)
+            )
 
-        account_id = db.create_account(
+        account_id = self.db.create_account(
             email=email.lower().strip(),
             password=self._hash_password(password),
             role=role,
@@ -89,7 +88,7 @@ class AdminAccount(Account):
 
         return account_id
 
-    def get_account(self, db: Database, account_id: int) -> dict:
+    def get_account(self, account_id: int) -> dict:
         """Retrieve account details by ID.
 
         Args:
@@ -102,7 +101,7 @@ class AdminAccount(Account):
         Raises:
             HTTPException: 404 if account not found
         """
-        if not (account := db.get_account(account_id=account_id)):
+        if not (account := self.db.get_account(account_id=account_id)):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Account {account_id} not found",
@@ -110,7 +109,7 @@ class AdminAccount(Account):
 
         return account
 
-    def deactivate_account(self, db: Database, account_id: int) -> bool:
+    def deactivate_account(self, account_id: int) -> bool:
         """Deactivate an account without deleting it.
 
         Args:
@@ -124,9 +123,9 @@ class AdminAccount(Account):
             HTTPException: 404 if account not found
             HTTPException: 500 if update fails
         """
-        self.get_account(db, account_id)
+        self.get_account(self.db, account_id)
 
-        if not db.update_account(account_id, status=Status.INACTIVE):
+        if not self.db.update_account(account_id, status=Status.INACTIVE):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to deactivate account {account_id}",
@@ -134,7 +133,7 @@ class AdminAccount(Account):
 
         return True
 
-    def delete_accounts(self, db: Database, account_ids: list[int]) -> bool:
+    def delete_accounts(self, account_ids: list[int]) -> bool:
         """Permanently delete multiple accounts.
 
         Args:
@@ -147,7 +146,7 @@ class AdminAccount(Account):
         Raises:
             HTTPException: 500 if deletion fails
         """
-        if not db.delete_accounts(account_ids):
+        if not self.db.delete_accounts(account_ids):
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to delete accounts {account_ids}",
@@ -156,7 +155,7 @@ class AdminAccount(Account):
         return True
 
     def get_all_accounts(
-        self, db: Database, filters: Optional[dict] = None
+        self, filters: Optional[dict] = None
     ) -> list[dict]:
         """Retrieve all accounts with optional filtering.
 
@@ -171,7 +170,7 @@ class AdminAccount(Account):
             HTTPException: 500 if query fails
         """
         try:
-            return db.get_accounts(**(filters or {}))
+            return self.db.get_accounts(**(filters or {}))
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

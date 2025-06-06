@@ -1,37 +1,286 @@
 <div id="employee" class="content-section">
     <div class="section-header">
         <h3>Employee Routes</h3>
-        <p>Management of products and reports</p>
+        <p>Functions requiring employee or admin privileges.</p>
     </div>
 
-    <!-- Template -->
+    <!-- Create Product -->
     <div class="endpoint-card">
         <div class="endpoint-header">
-            <span class="method-badge method-post">METHOD HERE</span>
-            <span>ENDPOINT HERE</span>
-            <p class="endpoint-description">
-                DESCRIPTION HERE
-            </p>
+            <span class="method-badge method-post">POST</span>
+            <span>/employee/products/create</span>
+            <p class="endpoint-description">Creates a new product.</p>
         </div>
         <div class="endpoint-body">
-            <div class="fake-data-section">
-                <h4>AUTO FILL SAMPLE:</h4>
-                <button id="fillSampleButton" class="btn btn-secondary btn-sm" style="margin-right: 5px; margin-bottom: 5px;">EXAMPLE</button>
-            </div>
-            
-            <form id="templateForm">
+            <form id="createProductForm">
                 <div class="form-group">
-                    <label for="example">EXAMPLE</label>
-                    <input type="text" id="example" class="form-control"> <!---Add required if needed-->
+                    <label for="createProductName">Product Name</label>
+                    <input type="text" id="createProductName" class="form-control" required minlength="1" maxlength="255">
                 </div>
-                <button type="submit" class="btn btn-primary">SUBMIT</button>
+                <div class="form-group">
+                    <label for="createProductDescription">Description</label>
+                    <textarea id="createProductDescription" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="createProductPrice">Price</label>
+                    <input type="number" id="createProductPrice" class="form-control" step="0.01" min="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="createProductStock">Stock (initial)</label>
+                    <input type="number" id="createProductStock" class="form-control" min="0" value="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="createProductAvailable">Available for Sale (initial)</label>
+                    <input type="number" id="createProductAvailable" class="form-control" min="0" value="0" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Product</button>
             </form>
-            <div id="templateResponse" class="response-container" style="display: none;">
+            <div id="createProductResponse" class="response-container" style="display: none;">
                 <br><h3>Response:</h3><br>
-                <details open>
-                    <summary><strong>Raw JSON Response</strong></summary><br>
-                    <div class="response-content"></div>
-                </details> 
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Product -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-patch">PATCH</span>
+            <span>/employee/products/update/{product_id}</span>
+            <p class="endpoint-description">Updates an existing product.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="updateProductForm">
+                <div class="form-group">
+                    <label for="updateProductId_ProductSelect">Product to Update</label>
+                    <select id="updateProductId_ProductSelect" class="form-control" required>
+                        <option value="">Select product</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="updateProductName">New Name (optional)</label>
+                    <input type="text" id="updateProductName" class="form-control" minlength="1" maxlength="255">
+                </div>
+                <div class="form-group">
+                    <label for="updateProductDescription">New Description (optional)</label>
+                    <textarea id="updateProductDescription" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="updateProductPrice">New Price (optional)</label>
+                    <input type="number" id="updateProductPrice" class="form-control" step="0.01" min="0.01">
+                </div>
+                <div class="form-group">
+                    <label for="updateProductStock">New Stock (optional)</label>
+                    <input type="number" id="updateProductStock" class="form-control" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="updateProductAvailable">New Available for Sale (optional)</label>
+                    <input type="number" id="updateProductAvailable" class="form-control" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="updateProductDiscontinued">Discontinued (optional)</label>
+                    <select id="updateProductDiscontinued" class="form-control">
+                        <option value="">Don't change</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Update Product</button>
+            </form>
+            <div id="updateProductResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Tag -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">POST</span>
+            <span>/employee/tags/create</span>
+            <p class="endpoint-description">Creates a new tag in the system.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="createTagForm">
+                <div class="form-group">
+                    <label for="createTagName">Tag Name</label>
+                    <input type="text" id="createTagName" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Tag</button>
+            </form>
+            <div id="createTagResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Get All Tags -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/employee/tags</span>
+            <p class="endpoint-description">Retrieves all tags from the system.</p>
+        </div>
+        <div class="endpoint-body">
+            <button id="getAllTagsBtn" class="btn btn-info">Get All Tags</button>
+            <div id="getAllTagsResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Table</strong></summary><div class="table-container"></div><br></details>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Tag -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-delete">DELETE</span>
+            <span>/employee/tags/delete/{tag_id}</span>
+            <p class="endpoint-description">Deletes a tag from the system by its ID.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="deleteTagForm">
+                <div class="form-group">
+                    <label for="deleteTagId_TagSelect">Tag to Delete</label>
+                    <select id="deleteTagId_TagSelect" class="form-control" required>
+                        <option value="">Select tag</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-danger">Delete Tag</button>
+            </form>
+            <div id="deleteTagResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Tag to Product -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">POST</span>
+            <span>/employee/products/{product_id}/tags/add/{tag_id}</span>
+            <p class="endpoint-description">Assigns an existing tag to an existing product.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="addProductTagForm">
+                <div class="form-group">
+                    <label for="addProductTag_ProductId_ProductSelect">Product</label>
+                    <select id="addProductTag_ProductId_ProductSelect" class="form-control" required>
+                        <option value="">Select product</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="addProductTag_TagId_TagSelect">Tag to Add</label>
+                    <select id="addProductTag_TagId_TagSelect" class="form-control" required>
+                        <option value="">Select tag</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Add Tag to Product</button>
+            </form>
+            <div id="addProductTagResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Remove Tag from Product -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-delete">DELETE</span>
+            <span>/employee/products/{product_id}/tags/remove/{tag_id}</span>
+            <p class="endpoint-description">Removes a tag association from a product.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="removeProductTagForm">
+                <div class="form-group">
+                    <label for="removeProductTag_ProductId_ProductSelect">Product</label>
+                    <select id="removeProductTag_ProductId_ProductSelect" class="form-control" required>
+                        <option value="">Select product</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="removeProductTag_TagId_TagSelect">Tag to Remove</label>
+                    <select id="removeProductTag_TagId_TagSelect" class="form-control" required>
+                        <option value="">Select tag</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-danger">Remove Tag from Product</button>
+            </form>
+            <div id="removeProductTagResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Image to Product -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-post">POST</span>
+            <span>/employee/products/{product_id}/images/add</span>
+            <p class="endpoint-description">Adds an image URL and associates it with a product.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="addProductImageForm">
+                <div class="form-group">
+                    <label for="addProductImage_ProductId_ProductSelect">Product</label>
+                    <select id="addProductImage_ProductId_ProductSelect" class="form-control" required>
+                        <option value="">Select product</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="addProductImage_Url">Image URL</label>
+                    <input type="url" id="addProductImage_Url" class="form-control" required placeholder="https://example.com/image.png">
+                </div>
+                <button type="submit" class="btn btn-primary">Add Image to Product</button>
+            </form>
+            <div id="addProductImageResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Image (Globally) -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-delete">DELETE</span>
+            <span>/employee/images/{image_id}</span>
+            <p class="endpoint-description">Deletes an image from the system and unlinks it from any products.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="deleteImageForm">
+                <div class="form-group">
+                    <label for="deleteImageId">Image ID to Delete</label>
+                    <input type="number" id="deleteImageId" class="form-control" required placeholder="Enter Image ID">
+                    <small>Note: Deleting an image here removes it from the system and any products it's linked to.</small>
+                </div>
+                <button type="submit" class="btn btn-danger">Delete Image</button>
+            </form>
+            <div id="deleteImageResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Get All Orders -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/employee/orders</span>
+            <p class="endpoint-description">Returns a list of all orders in the system.</p>
+        </div>
+        <div class="endpoint-body">
+            <button id="getAllOrdersBtn" class="btn btn-primary">Get All Orders</button>
+            <div id="getAllOrdersResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Table</strong></summary><div class="table-container"></div><br></details>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
             </div>
         </div>
     </div>

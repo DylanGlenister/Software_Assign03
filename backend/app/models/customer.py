@@ -25,25 +25,13 @@ class CustomerAccount(Account):
         db: Database,
     ):
         self.trolley: Trolley = Trolley(db, accountID)
-        self.db: Database = db
 
         super().__init__(
-            accountID,
-            creationDate,
-            role,
-            status,
-            email,
-            password,
-            firstname,
-            lastname)
+            accountID, creationDate, role, status, email, password, firstname, lastname, db
+        )
 
     @classmethod
-    def register(
-            cls,
-            db: Database,
-            email: EmailStr,
-            password: str,
-            role: Role):
+    def register(cls, db: Database, email: EmailStr, password: str, role: Role):
         """Create a new account with hashed password."""
         existing: dict | None = db.get_account(_email=email)
         if existing:
@@ -113,10 +101,10 @@ class CustomerAccount(Account):
 
         has_address = False
         for address in addresses:
-            if address.get("addressID") == address_id: 
+            if address.get("addressID") == address_id:
                 has_address = True
                 break
-        
+
         if not has_address:
             raise HTTPException(
                 status_code=httpStatus.HTTP_404_NOT_FOUND,

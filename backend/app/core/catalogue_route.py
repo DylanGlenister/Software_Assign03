@@ -10,12 +10,11 @@ and serialization.
 from enum import Enum
 from typing import Annotated
 
-from fastapi import (APIRouter, Body, Depends, HTTPException, Path, Query,
-                     status)
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from ..core.database import ID, Database, get_db
 from ..models.catalogue import Catalogue
-from ..models.product import Product, ProductCreate, ProductUpdate
+from ..models.product import Product
 from ..utils.settings import SETTINGS
 
 # This router will contain all the API endpoints related to the catalogue.
@@ -27,6 +26,7 @@ catalogue_route = APIRouter(
 
 class SortOptions(str, Enum):
     """Defines available sorting options for catalogue endpoints."""
+
     PRICE_ASC = "price_asc"
     PRICE_DESC = "price_desc"
 
@@ -78,12 +78,10 @@ def _process_products(
 def list_all_products(
     catalogue: Annotated[Catalogue, Depends(get_catalogue_service)],
     available_only: Annotated[
-        bool,
-        Query(description="Filter for products with available stock.")
+        bool, Query(description="Filter for products with available stock.")
     ] = False,
     sort_by: Annotated[
-        SortOptions | None,
-        Query(description="Sort products by price.")
+        SortOptions | None, Query(description="Sort products by price.")
     ] = None,
 ):
     """
@@ -95,28 +93,6 @@ def list_all_products(
     return _process_products(all_products, available_only, sort_by)
 
 
-@catalogue_route.post(
-    "/create",
-    response_model=Product,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create a New Product",
-)
-def create_product(
-    catalogue: Annotated[Catalogue, Depends(get_catalogue_service)],
-    product_to_create: Annotated[ProductCreate, Body(...)],
-):
-    """
-    Creates a new product in the catalogue.
-
-    The request body must contain the product's name, description, price,
-    and initial stock levels. The new product is returned upon success.
-    """
-    try:
-        return catalogue.create_product(product_to_create)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-
 @catalogue_route.get(
     "/search",
     response_model=list[Product],
@@ -125,16 +101,13 @@ def create_product(
 def search_products(
     catalogue: Annotated[Catalogue, Depends(get_catalogue_service)],
     query: Annotated[
-        str,
-        Query(description="Search term for product name, description, or tags.")
+        str, Query(description="Search term for product name, description, or tags.")
     ],
     available_only: Annotated[
-        bool,
-        Query(description="Filter for products with available stock.")
+        bool, Query(description="Filter for products with available stock.")
     ] = False,
     sort_by: Annotated[
-        SortOptions | None,
-        Query(description="Sort products by price.")
+        SortOptions | None, Query(description="Sort products by price.")
     ] = None,
 ):
     """
@@ -156,15 +129,13 @@ def get_products_by_tags(
     catalogue: Annotated[Catalogue, Depends(get_catalogue_service)],
     tags: Annotated[
         list[str],
-        Query(alias="t", description="One or more tags to filter products by.")
+        Query(alias="t", description="One or more tags to filter products by."),
     ],
     available_only: Annotated[
-        bool,
-        Query(description="Filter for products with available stock.")
+        bool, Query(description="Filter for products with available stock.")
     ] = False,
     sort_by: Annotated[
-        SortOptions | None,
-        Query(description="Sort products by price.")
+        SortOptions | None, Query(description="Sort products by price.")
     ] = None,
 ):
     """
@@ -201,28 +172,3 @@ def get_product(
             detail=f"Product with ID {product_id} not found.",
         )
     return product
-
-
-@catalogue_route.patch(
-    "/{product_id}",
-    response_model=Product,
-    summary="Update a Product",
-)
-def update_product(
-    catalogue: Annotated[Catalogue, Depends(get_catalogue_service)],
-    product_id: Annotated[ID, Path(description="The ID of the product to update.")],
-    product_to_update: Annotated[ProductUpdate, Body(...)],
-):
-    """
-    Updates an existing product's details.
-
-    The request body should contain only the fields that need to be changed.
-    All fields are optional.
-    """
-    updated_product = catalogue.update_product(product_id, product_to_update)
-    if not updated_product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Product with ID {product_id} not found.",
-        )
-    return updated_product

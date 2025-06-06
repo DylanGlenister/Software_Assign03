@@ -52,13 +52,13 @@ INSERT INTO `Product` (`name`, `description`, `price`, `stock`, `available`, `cr
 -- -----------------------------------------------------
 INSERT INTO `Account` (`creationDate`,`role`,`status`, `email`,`password`,`firstname`,`lastname`) VALUES
 ('2025-06-03 12:31:22','owner','active','owner@example.com','$2b$12$ylMA7etilb3SgU1.u0kFq.1.bG.AjJOr5LRiIs5opeA3oMuJD.6MG','Owner','Account'),
-('2025-06-03 21:06:06','employee','active','employee@example.com','$2b$12$XIl1CHj8sSoYa2CIxdnY7.cNhe.CfFprQ6cavco.wqqzbaz.iTMl2','Emily','Ployee'),
+('2025-06-03 21:06:06','employee','active','employee@example.com','$2b$12$FrrXzO56Q6Qd5mTZ1w.4IuMKe.EuW/RqWXhy5WDRoqpA1g36tt0xm','Emily','Ployee'),
 ('2025-06-03 21:06:06','admin','active','admin@example.com','$2b$12$tFk05HaXEgTFymypVz3ppO3iaBF4RqT7PpwXovU62LPbSVrRaK7Kq','Adam','Nistrator'),
-('2025-06-03 21:06:06','customer','active','customer@example.com','$2b$12$eh7vq6/BKJpR/2lsnF8rauhmHV.wSc01WlqmC0a7HRnk5V2TBg/ue','Chris','Tommer'),
-('2024-05-01 10:00:00','customer','active','janedoe.customer@example.com','$2b$12$fO9iGDRCRzFr3zWiqk.hA.Lp7QYMGmxHyV60Cwsdq7tY7PzY.xY/S','Jane','Doe'),
-('2024-05-15 14:30:00','guest','unverified','guest.user.temp@example.com','$2b$12$NotARealHashButLooksLikeIt/123456789012345678901234567890','Guest','User'),
-('2023-11-20 08:00:00','customer','inactive','inactive.customer.profile@example.com','$2b$12$AnotherFakeHashValueHereOkayOKThenThisIsIt','Inactive','Person'),
-('2024-06-01 11:00:00','customer','unverified','new.customer.signup@example.com','$2b$12$YetAnotherSecurePasswordHashValueHereOkayOK','Newbie','Shopper');
+('2025-06-03 21:06:06','customer','active','customer@example.com','2b$12$eh7vq6/BKJpR/2lsnF8rauhmHV.wSc01WlqmC0a7HRnk5V2TBg/ue','Chris','Tommer'),
+('2024-05-01 10:00:00','customer','active','janedoe.customer@example.com','2b$12$eh7vq6/BKJpR/2lsnF8rauhmHV.wSc01WlqmC0a7HRnk5V2TBg/ue','Jane','Doe'),
+('2024-05-15 14:30:00','guest','unverified','guest.user.temp@example.com',NULL,'Guest','User'),
+('2023-11-20 08:00:00','customer','inactive','inactive.customer.profile@example.com','2b$12$eh7vq6/BKJpR/2lsnF8rauhmHV.wSc01WlqmC0a7HRnk5V2TBg/ue','Inactive','Person'),
+('2024-06-01 11:00:00','customer','unverified','new.customer.signup@example.com','2b$12$eh7vq6/BKJpR/2lsnF8rauhmHV.wSc01WlqmC0a7HRnk5V2TBg/ue','Newbie','Shopper');
 -- Account IDs should be 1 through 8
 
 -- -----------------------------------------------------
