@@ -170,5 +170,5 @@ class ProductUpdate(BaseModel):
 
     class Config:
         """Pydantic model configuration."""
-
+        from_attributes = True
         populate_by_name = True

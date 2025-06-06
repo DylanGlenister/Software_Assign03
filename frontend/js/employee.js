@@ -1,33 +1,25 @@
 function initEmployee() {
-    // Product Forms
     document.getElementById('createProductForm')?.addEventListener('submit', handleCreateProduct);
     document.getElementById('updateProductForm')?.addEventListener('submit', handleUpdateProduct);
     
-    // Order Button
     document.getElementById('getAllOrdersBtn')?.addEventListener('click', getAllOrders);
 
-    // Tag Forms & Button
     document.getElementById('createTagForm')?.addEventListener('submit', handleCreateTag);
-    document.getElementById('getAllTagsBtn')?.addEventListener('click', getAllTags);
     document.getElementById('deleteTagForm')?.addEventListener('submit', handleDeleteTag);
 
-    // Product-Tag Forms
     document.getElementById('addProductTagForm')?.addEventListener('submit', handleAddTagToProduct);
     document.getElementById('removeProductTagForm')?.addEventListener('submit', handleRemoveTagFromProduct);
 
-    // Product-Image & Image Forms
     document.getElementById('addProductImageForm')?.addEventListener('submit', handleAddImageToProduct);
     document.getElementById('deleteImageForm')?.addEventListener('submit', handleDeleteImage);
 
-    // Initial population of dropdowns
     populateProductDropdowns();
     populateTagDropdowns();
 }
 
-// --- Dropdown Population ---
 function populateProductDropdowns() {
     setSelectOptions({
-        endpoint: '/customer/products', // Assuming this lists all products
+        endpoint: '/catalogue/all',
         elements: [
             'updateProductId_ProductSelect', 
             'addProductTag_ProductId_ProductSelect', 
@@ -35,8 +27,8 @@ function populateProductDropdowns() {
             'addProductImage_ProductId_ProductSelect'
         ],
         label: 'Select product',
-        key: 'products', 
-        errorMessage: 'Could not get products list. Ensure you are logged in.',
+        key: '', 
+        errorMessage: 'Could not get products list.',
         requireAuth: true, 
         nameKey: "name",
         idKey: "productID"
@@ -45,18 +37,18 @@ function populateProductDropdowns() {
 
 function populateTagDropdowns() {
     setSelectOptions({
-        endpoint: '/employee/tags', // Endpoint to get all tags
+        endpoint: '/employee/tags',
         elements: [
             'deleteTagId_TagSelect',
             'addProductTag_TagId_TagSelect',
             'removeProductTag_TagId_TagSelect'
         ],
         label: 'Select tag',
-        key: '', // Assuming the response is directly an array of tags
+        key: '',
         errorMessage: 'Could not get tags list. Ensure you are logged in.',
         requireAuth: true,
-        nameKey: "name",   // from TagResponse model
-        idKey: "tagID"     // from TagResponse model
+        nameKey: "name", 
+        idKey: "tagID"
     });
 }
 
@@ -76,7 +68,7 @@ async function handleCreateProduct(e) {
     if (response.ok) {
         showNotification('Product created successfully!', 'success');
         document.getElementById('createProductForm').reset();
-        populateProductDropdowns(); // Refresh product lists
+        populateProductDropdowns();
     } else {
         showNotification(response.data?.detail || 'Failed to create product!', 'error');
     }
@@ -112,6 +104,8 @@ async function handleUpdateProduct(e) {
         setFormLoading('updateProductForm', false); return;
     }
 
+    console.log(productId)
+
     const response = await makeRequest(`/employee/products/update/${productId}`, 'PATCH', payload, true);
     if (response.ok) {
         showNotification('Product updated successfully!', 'success');
@@ -127,7 +121,7 @@ async function handleUpdateProduct(e) {
 
 // --- Order Handler ---
 async function getAllOrders() {
-    // setFormLoading('getAllOrdersBtn', true); // If you want loading state on button
+    setFormLoading('getAllOrdersBtn', true);
     const response = await makeRequest('/employee/orders', 'GET', null, true);
     if (response.ok) {
         showNotification('Orders retrieved successfully!', 'success');
@@ -141,7 +135,7 @@ async function getAllOrders() {
         showNotification(response.data?.detail || 'Failed to retrieve orders!', 'error');
     }
     displayResponse('getAllOrdersResponse', response);
-    // setFormLoading('getAllOrdersBtn', false);
+    setFormLoading('getAllOrdersBtn', false);
 }
 
 // --- Tag Handlers ---
@@ -153,28 +147,12 @@ async function handleCreateTag(e) {
     if (response.ok) {
         showNotification('Tag created successfully!', 'success');
         document.getElementById('createTagForm').reset();
-        populateTagDropdowns(); // Refresh tag lists
+        populateTagDropdowns();
     } else {
         showNotification(response.data?.detail || 'Failed to create tag!', 'error');
     }
     displayResponse('createTagResponse', response);
     setFormLoading('createTagForm', false);
-}
-
-async function getAllTags() {
-    const response = await makeRequest('/employee/tags', 'GET', null, true);
-    if (response.ok) {
-        showNotification('Tags retrieved successfully!', 'success');
-        if (response.data && Array.isArray(response.data)) {
-            createTable('getAllTagsResponse', response.data.length > 0 ? response.data : []);
-        } else {
-            const container = document.getElementById('getAllTagsResponse').querySelector('.table-container');
-            if(container) container.innerHTML = "<p>Tags data not in expected format.</p>";
-        }
-    } else {
-        showNotification(response.data?.detail || 'Failed to retrieve tags!', 'error');
-    }
-    displayResponse('getAllTagsResponse', response);
 }
 
 async function handleDeleteTag(e) {
@@ -189,7 +167,7 @@ async function handleDeleteTag(e) {
     if (response.ok) {
         showNotification('Tag deleted successfully!', 'success');
         document.getElementById('deleteTagForm').reset();
-        populateTagDropdowns(); // Refresh
+        populateTagDropdowns();
     } else {
         showNotification(response.data?.detail || 'Failed to delete tag!', 'error');
     }

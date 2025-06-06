@@ -1,0 +1,158 @@
+<div id="catalogue" class="content-section">
+    <div class="section-header">
+        <h3>Product Catalogue Routes</h3>
+        <p>Publicly accessible routes to browse and search products.</p>
+    </div>
+
+    <!-- List All Products -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/catalogue/all</span>
+            <p class="endpoint-description">Retrieves a list of all products.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="listAllProductsForm">
+                <button type="submit" class="btn btn-primary">Get All Products</button>
+            </form>
+            <div id="listAllProductsResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Table</strong></summary><div class="table-container"></div><br></details>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+        <!-- Get All Tags -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/catalogue/tags</span>
+            <p class="endpoint-description">Retrieves all tags from the system.</p>
+        </div>
+        <div class="endpoint-body">
+            <button id="getAllTagsBtn" class="btn btn-primary">Get All Tags</button>
+            <div id="getAllTagsResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Table</strong></summary><div class="table-container"></div><br></details>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Products -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/catalogue/search</span>
+            <p class="endpoint-description">Searches for products matching a query string (name, description, tags). Allows filtering and sorting.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="searchProductsForm">
+                <div class="form-group">
+                    <label for="searchQuery">Search Term</label>
+                    <input type="text" id="searchQuery" class="form-control" placeholder="e.g., laptop, book, electronics" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="searchAvailableOnly">Availability</label>
+                        <select id="searchAvailableOnly" class="form-control">
+                            <option value="false">Show All</option>
+                            <option value="true">Available Only</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="searchSortBy">Sort By</label>
+                        <select id="searchSortBy" class="form-control">
+                            <option value="">No Sorting</option>
+                            <option value="price_asc">Price: Low to High</option>
+                            <option value="price_desc">Price: High to Low</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Search Products</button>
+            </form>
+            <div id="searchProductsResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Table</strong></summary><div class="table-container"></div><br></details>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Get Products by Tags -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/catalogue/tagged</span>
+            <p class="endpoint-description">Retrieves products associated with specified tags. Allows filtering and sorting.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="getProductsByTagsForm">
+                <div class="form-group">
+                    <label for="catalogueTagsInput">Select Tags</label>
+                    <div class="custom-tags-input-container">
+                        <div id="selectedCatalogueTagsContainer" class="selected-tags-area">
+                            <!-- Selected tag pills will appear here -->
+                        </div>
+                        <input type="text" id="catalogueTagsInputTrigger" class="form-control" placeholder="Click to add or type to filter tags...">
+                        <div id="availableCatalogueTagsDropdown" class="tags-dropdown">
+                            <!-- Available tags will be listed here -->
+                        </div>
+                    </div>
+                    <small class="form-text text-muted">Products matching ALL selected tags will be shown.</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="taggedAvailableOnly">Availability</label>
+                        <select id="taggedAvailableOnly" class="form-control">
+                            <option value="false">Show All</option>
+                            <option value="true">Available Only</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="taggedSortBy">Sort By</label>
+                        <select id="taggedSortBy" class="form-control">
+                            <option value="">No Sorting</option>
+                            <option value="price_asc">Price: Low to High</option>
+                            <option value="price_desc">Price: High to Low</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Get Products by Tags</button>
+            </form>
+            <div id="getProductsByTagsResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <details open><summary><strong>Table</strong></summary><div class="table-container"></div><br></details>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Get Specific Product by ID -->
+    <div class="endpoint-card">
+        <div class="endpoint-header">
+            <span class="method-badge method-get">GET</span>
+            <span>/catalogue/{product_id}</span>
+            <p class="endpoint-description">Retrieves a single product by its unique ID.</p>
+        </div>
+        <div class="endpoint-body">
+            <form id="getProductByIdForm">
+                <div class="form-group">
+                    <label for="getProductId">Product ID</label>
+                    <input type="number" id="getProductId" class="form-control" placeholder="Enter Product ID" required min="1">
+                </div>
+                <button type="submit" class="btn btn-primary">Get Product</button>
+            </form>
+            <div id="getProductByIdResponse" class="response-container" style="display: none;">
+                <br><h3>Response:</h3><br>
+                <!-- No table for single product, just raw JSON, but createTable can handle single object in array -->
+                <details open><summary><strong>Table (if applicable)</strong></summary><div class="table-container"></div><br></details>
+                <details open><summary><strong>Raw JSON Response</strong></summary><br><div class="response-content"></div></details>
+            </div>
+        </div>
+    </div>
+
+</div>

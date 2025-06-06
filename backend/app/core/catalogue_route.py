@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from ..core.database import ID, Database, get_db
 from ..models.catalogue import Catalogue
+from ..models.employee import TagResponse
 from ..models.product import Product
 from ..utils.settings import SETTINGS
 
@@ -119,6 +120,17 @@ def search_products(
     found_products = catalogue.search_products(query)
     return _process_products(found_products, available_only, sort_by)
 
+@catalogue_route.get(
+    "/tags",
+    response_model=list[TagResponse],
+    summary="Get All Tags"
+)
+def get_all_tags_route(catalogue: Annotated[Catalogue, Depends(get_catalogue_service)]):
+    """Retrieves all tags from the system."""
+    tags_data = catalogue.db.get_all_tags()
+    if tags_data is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve tags.")
+    return [TagResponse(tagID=tag['tagID'], name=tag['name']) for tag in tags_data]
 
 @catalogue_route.get(
     "/tagged",

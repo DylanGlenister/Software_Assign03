@@ -86,15 +86,6 @@ def create_tag_route(
     """Creates a new tag in the system."""
     return account.create_new_tag(tag_data.name)
 
-@employee_route.get(
-    "/tags",
-    response_model=list[TagResponse],
-    summary="Get All Tags"
-)
-def get_all_tags_route(account: EmployeeAccount = Depends(get_employee_account)):
-    """Retrieves all tags from the system."""
-    return account.get_all_system_tags()
-
 @employee_route.delete(
     "/tags/delete/{tag_id}",
     status_code=status.HTTP_200_OK,

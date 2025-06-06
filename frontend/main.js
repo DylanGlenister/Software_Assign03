@@ -9,7 +9,7 @@ async function makeRequest(endpoint, method = 'GET', body = null, requireAuth = 
         headers['Authorization'] = `Bearer ${AUTH_TOKEN}`;
     }
     const config = { method, headers };
-    if (body && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
+    if (body && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
         config.body = JSON.stringify(body);
     }
 
@@ -193,19 +193,24 @@ function formatValue(value) {
 async function setSelectOptions({ endpoint, elements, label = 'Select an option', key, errorMessage, requireAuth = false, idKey = "id", nameKey = "name"}) {
     const response = await makeRequest(endpoint, 'GET', {}, requireAuth);
 
-    if (!response.ok || !response.data || !response.data[key]) {
+    if (!response.ok || !response.data || (key !== "" && !response.data[key])) {
         showNotification(errorMessage, 'error');
-        console.log(response)
+        console.log(response);
         return;
     }
-    console.log(response)
-    
+
+    const dataToUse = key === "" ? response.data : response.data[key];
+
     elements.forEach(elementId => {
         const selectElement = document.getElementById(elementId);
+        if (!selectElement) {
+            console.warn(`Element with ID '${elementId}' not found.`);
+            return;
+        }
+
         selectElement.innerHTML = `<option value="">${label}</option>`;
-        
-        setOptions(response.data[key], selectElement, idKey, nameKey);
-    })
+        setOptions(dataToUse, selectElement, idKey, nameKey);
+    });
 }
 
 // --- NAVIGATION AND PARTIAL LOADING ---
@@ -254,6 +259,10 @@ async function loadSection(sectionName) {
             case 'employee':
                 if (typeof initEmployee === 'function') initEmployee();
                 else console.warn('initEmployee function not found.');
+                break;
+            case 'catalogue':
+                if (typeof initCatalogue === 'function') initCatalogue();
+                else console.warn('initCatalogue function not found.');
                 break;
 
             default:

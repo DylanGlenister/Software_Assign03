@@ -100,13 +100,6 @@ class EmployeeAccount(Account):
         except Exception as e: 
             raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create tag: {str(e)}")
 
-    def get_all_system_tags(self) -> list[TagResponse]:
-        """Retrieves all tags from the system."""
-        tags_data = self.db.get_all_tags()
-        if tags_data is None:
-            raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve tags.")
-        return [TagResponse(tagID=tag['tagID'], name=tag['name']) for tag in tags_data]
-
     def delete_system_tag(self, tag_id: ID) -> dict[str, str]:
         """Deletes a tag from the system by its ID."""
         try:

@@ -415,3 +415,80 @@ details[open] summary::before {
 summary:hover {
   color: #3367d6;
 }
+
+.custom-tags-input-container {
+    position: relative;
+    border: 1px solid #ced4da;
+    border-radius: .25rem;
+    padding: .375rem .75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    min-height: calc(1.5em + .75rem + 2px); 
+}
+
+.selected-tags-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 5px;
+}
+
+.tag-pill {
+    background-color: #007bff;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 0.9em;
+    display: flex;
+    align-items: center;
+    margin-right: 5px; 
+    margin-bottom: 5px; 
+}
+
+.tag-pill .remove-tag {
+    margin-left: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+#catalogueTagsInputTrigger {
+    border: none;
+    outline: none;
+    flex-grow: 1;
+    padding: 0;
+    min-width: 150px;
+}
+#catalogueTagsInputTrigger:focus {
+    box-shadow: none;
+}
+
+
+.tags-dropdown {
+    display: none; 
+    position: absolute;
+    top: 100%; 
+    left: 0;
+    right: 0;
+    background-color: white;
+    border: 1px solid #ced4da;
+    border-top: none;
+    border-radius: 0 0 .25rem .25rem;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000; 
+}
+
+.tags-dropdown .tag-item {
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.tags-dropdown .tag-item:hover {
+    background-color: #f0f0f0;
+}
+
+.tags-dropdown .tag-item.selected {
+    background-color: #e0e0e0;
+    font-style: italic;
+}
