@@ -137,8 +137,10 @@
         <div class="endpoint-body">
             <form id="modifyItemInTrolleyForm">
                 <div class="form-group">
-                    <label for="modifyProductId">Product ID</label>
-                    <input type="number" id="modifyProductId" class="form-control" required>
+                    <label for="updateProductId">Product ID</label>
+                    <select id="updateProductId" class="form-control">
+                        <option value="">Select product</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="modifyAmount">Amount</label>
@@ -170,7 +172,9 @@
             <form id="removeFromTrolleyForm">
                 <div class="form-group">
                     <label for="removeProductId">Product ID</label>
-                    <input type="number" id="removeProductId" class="form-control" required>
+                    <select id="removeProductId" class="form-control">
+                        <option value="">Select product</option>
+                    </select>
                 </div>
                 <button type="submit" class="btn btn-primary">Remove from Trolley</button>
             </form>
@@ -223,7 +227,6 @@
                 <div class="form-group">
                     <label for="createOrderAddressId">Address ID</label>
                     <input type="number" id="createOrderAddressId" class="form-control" required placeholder="Enter Address ID">
-                    <!-- Consider populating this with a select after fetching addresses -->
                 </div>
                 <button type="submit" class="btn btn-primary">Create Order</button>
             </form>

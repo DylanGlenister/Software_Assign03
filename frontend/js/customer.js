@@ -13,9 +13,13 @@ function initCustomer() {
     document.getElementById('addAddressForm')?.addEventListener('submit', handleAddAddress);
     document.getElementById('removeAddressForm')?.addEventListener('submit', handleRemoveAddress);
 
+    updateProductOptions()
+}
+
+function updateProductOptions(){
     setSelectOptions({
         endpoint: '/utility/getProducts',
-        elements: ['addProductId'],
+        elements: ['addProductId', 'updateProductId', 'removeProductId'],
         label: 'Select product',
         key: 'products',
         idKey: 'productID',
@@ -68,18 +72,20 @@ async function handleAddToTrolley(e) {
     if (response.ok) showNotification('Item added to trolley successfully!', 'success');
     else showNotification('Failed to add item to trolley!', 'error');
     displayResponse('addToTrolleyResponse', response);
+    updateProductOptions()
     setFormLoading('addToTrolleyForm', false);
 }
 
 async function handleModifyItemInTrolley(e) {
     e.preventDefault();
     setFormLoading('modifyItemInTrolleyForm', true);
-    const productId = parseInt(document.getElementById('modifyProductId').value);
+    const productId = parseInt(document.getElementById('updateProductId').value);
     const amount = parseInt(document.getElementById('modifyAmount').value);
     const response = await makeRequest('/customer/trolley/modify', 'POST', { product_id: productId, amount: amount }, true);
     if (response.ok) showNotification('Item modified in trolley successfully!', 'success');
     else showNotification('Failed to modify item in trolley!', 'error');
     displayResponse('modifyItemInTrolleyResponse', response);
+    updateProductOptions()
     setFormLoading('modifyItemInTrolleyForm', false);
 }
 
@@ -91,6 +97,7 @@ async function handleRemoveFromTrolley(e) {
     if (response.ok) showNotification('Item removed from trolley successfully!', 'success');
     else showNotification('Failed to remove item from trolley!', 'error');
     displayResponse('removeFromTrolleyResponse', response);
+    updateProductOptions()
     setFormLoading('removeFromTrolleyForm', false);
 }
 

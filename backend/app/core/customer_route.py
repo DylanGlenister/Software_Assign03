@@ -125,7 +125,7 @@ def modify_number_in_trolley(
     if success:
         result["message"] = "Item quantity has been modified in the trolley"
     else:
-        result["error"] = "Failed to modify item quantity from the trolley"
+        result["error"] = "Failed to modify item quantity from the trolley, becuase it doesnt exist in the trolley."
     return result
 
 
@@ -144,7 +144,7 @@ def remove_from_trolley_route(
     if success:
         result["message"] = "Item has been removed from the trolley"
     else:
-        result["error"] = "Failed to remove item from the trolley"
+        result["error"] = "Failed to remove item from the trolley, becuase it doesnt exist in the trolley."
     return result
 
 
@@ -161,7 +161,7 @@ def clear_trolley_route(customer_data: dict = Depends(get_customer_account)):
     if success:
         result["message"] = "Trolley has been cleared"
     else:
-        result["error"] = "Failed to clear trolley"
+        result["error"] = "Trolley is already empty"
     return result
 
 
@@ -220,6 +220,7 @@ def customer_add_address(
     result: dict = {"token": customer_data.get("token")}
 
     if customer.add_address(payload.address):
+        result["message"] = "Address was addedd successfully."
         return result
 
     raise HTTPException(
@@ -239,6 +240,7 @@ def customer_remove_address(
 
     result: dict = {"token": customer_data.get("token")}
     if customer.remove_address(payload.address_id):
+        result["message"] = "Address was removed successfully."
         return result
 
     raise HTTPException(
