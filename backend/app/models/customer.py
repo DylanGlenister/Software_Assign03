@@ -27,11 +27,24 @@ class CustomerAccount(Account):
         self.trolley: Trolley = Trolley(db, accountID)
 
         super().__init__(
-            accountID, creationDate, role, status, email, password, firstname, lastname, db
+            accountID,
+            creationDate,
+            role,
+            status,
+            email,
+            password,
+            firstname,
+            lastname,
+            db,
         )
 
     @classmethod
-    def register(cls, db: Database, email: EmailStr, password: str, role: Role):
+    def register(
+            cls,
+            db: Database,
+            email: EmailStr,
+            password: str,
+            role: Role):
         """Create a new account with hashed password."""
         existing: dict | None = db.get_account(_email=email)
         if existing:

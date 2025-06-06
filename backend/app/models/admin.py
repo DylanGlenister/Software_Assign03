@@ -17,8 +17,9 @@ class AdminAccount(Account):
         super().__init__(*args, **kwargs)
 
     def change_others_password(
-        self, new_password: str, account_id: int
-    ) -> None:
+            self,
+            new_password: str,
+            account_id: int) -> None:
         """Change another user's password with admin privileges.
 
         Args:
@@ -32,8 +33,8 @@ class AdminAccount(Account):
         """
         if errors := self.verify_password(new_password):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(errors)
-            )
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(errors))
 
         hashed_password = self._hash_password(new_password)
         if not self.db.update_account(account_id, password=hashed_password):
@@ -45,8 +46,10 @@ class AdminAccount(Account):
         self.password = hashed_password
 
     def create_account(
-        self, role: Role, email: EmailStr, password: str
-    ) -> int:
+            self,
+            role: Role,
+            email: EmailStr,
+            password: str) -> int:
         """Create a new user account with admin privileges.
 
         Args:
@@ -71,8 +74,8 @@ class AdminAccount(Account):
 
         if errors := self.verify_password(password):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(errors)
-            )
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(errors))
 
         account_id = self.db.create_account(
             email=email.lower().strip(),
@@ -154,9 +157,7 @@ class AdminAccount(Account):
 
         return True
 
-    def get_all_accounts(
-        self, filters: Optional[dict] = None
-    ) -> list[dict]:
+    def get_all_accounts(self, filters: Optional[dict] = None) -> list[dict]:
         """Retrieve all accounts with optional filtering.
 
         Args:
