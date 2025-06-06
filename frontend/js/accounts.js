@@ -40,6 +40,7 @@ async function handleLogin(e) {
         console.error("Login failed response:", response);
     }
     displayResponse('loginResponse', response);
+    updateSidebarAccessIndicators()
     setFormLoading('loginForm', false);
 }
 
