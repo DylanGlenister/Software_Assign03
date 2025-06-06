@@ -46,7 +46,7 @@ class CustomerAccount(Account):
             password: str,
             role: Role):
         """Create a new account with hashed password."""
-        existing: dict | None = db.get_account(_email=email)
+        existing: dict | None = db.get_account(email=email)
         if existing:
             raise HTTPException(
                 status_code=httpStatus.HTTP_409_CONFLICT,
@@ -70,7 +70,7 @@ class CustomerAccount(Account):
         creation_date: datetime = datetime.now()
 
         accountID: int = db.create_account(
-            role, email, hashed_password, _creationDate=creation_date
+            role, email, hashed_password, creationDate=creation_date
         )
         if accountID is None:
             raise HTTPException(

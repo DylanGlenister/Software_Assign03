@@ -42,7 +42,7 @@ def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
     if not account:
         return {"message": "Invalid credentials"}
 
-    if account.status in ["inactive", "condemned"]:
+    if account.status in ["condemned"]:
         return {"message": "This account is inactive"}
 
     if account:

@@ -37,7 +37,7 @@ function populateProductDropdowns() {
 
 function populateTagDropdowns() {
     setSelectOptions({
-        endpoint: '/employee/tags',
+        endpoint: '/catalogue/tags',
         elements: [
             'deleteTagId_TagSelect',
             'addProductTag_TagId_TagSelect',

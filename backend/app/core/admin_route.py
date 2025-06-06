@@ -119,7 +119,7 @@ def delete_old_accounts_route(
     try:
         accounts = admin.get_all_accounts(
             {
-                "olderThan": payload.daysOld,
+                "olderThanDays": payload.daysOld,
                 "role": payload.role,
                 "status": payload.status,
             },
