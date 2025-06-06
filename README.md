@@ -4,6 +4,6 @@ Using fastAPI and uvicorn.
 
 See [backend/README.md](backend/README.md)
 ## Frontend
-- TBD
+Uses live-server from Node.js.
 
 See [frontend/README.md](frontend/README.md)
