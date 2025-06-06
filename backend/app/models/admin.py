@@ -78,9 +78,11 @@ class AdminAccount(Account):
                 detail=str(errors))
 
         account_id = self.db.create_account(
-            email=email.lower().strip(),
-            password=self._hash_password(password),
-            role=role,
+            role,
+            email.lower().strip(),
+            self._hash_password(password),
+            firstName="",
+            lastName=""
         )
 
         if not account_id:
@@ -95,7 +97,6 @@ class AdminAccount(Account):
         """Retrieve account details by ID.
 
         Args:
-            db: Database connection instance
             account_id: Target account ID to retrieve
 
         Returns:
@@ -104,7 +105,9 @@ class AdminAccount(Account):
         Raises:
             HTTPException: 404 if account not found
         """
-        if not (account := self.db.get_account(account_id=account_id)):
+        account = self.db.get_account(accountId=account_id)
+        print(account_id, account)
+        if not (account):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Account {account_id} not found",
@@ -116,7 +119,6 @@ class AdminAccount(Account):
         """Deactivate an account without deleting it.
 
         Args:
-            db: Database connection instance
             account_id: Target account ID to deactivate
 
         Returns:
@@ -126,7 +128,7 @@ class AdminAccount(Account):
             HTTPException: 404 if account not found
             HTTPException: 500 if update fails
         """
-        self.get_account(self.db, account_id)
+        self.get_account(account_id)
 
         if not self.db.update_account(account_id, status=Status.INACTIVE):
             raise HTTPException(

@@ -66,11 +66,7 @@ def update_account(
     payload: UpdateAccountPayload,
     account: Account = Depends(get_account),
 ):
-    # TODO This never gets reached somehow
-    print("Ping")
-    if not account.verify_perms(
-        [Role.GUEST], True
-    ):  # Dont allow guests to update their account
+    if account.role == Role.GUEST.value:  # Dont allow guests to update their account
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Guests cannot update their accounts. Please log in",
@@ -86,9 +82,8 @@ def change_password(
     payload: ChangePasswordPayload,
     account: Account = Depends(get_account),
 ):
-    if account.verify_perms(
-        [Role.GUEST], True
-    ):  # Dont allow guests to update their account
+
+    if account.role == Role.GUEST.value:  # Dont allow guests to update their account
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Guests cannot update their accounts. Please log in",
