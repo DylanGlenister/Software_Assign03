@@ -20,7 +20,7 @@ class Account:
         password: str | None,
         firstname: str | None,
         lastname: str | None,
-        db: Database
+        db: Database,
     ):
         self.db: Database = db
         self.accountID: int = accountID
@@ -48,7 +48,9 @@ class Account:
             print("No account found with that email.")
             return None
 
-        if checkpw(password.encode("utf-8"), account["password"].encode("utf-8")):
+        if checkpw(
+                password.encode("utf-8"),
+                account["password"].encode("utf-8")):
             return cls(
                 accountID=account["accountID"],
                 email=account["email"],
@@ -58,7 +60,7 @@ class Account:
                 creationDate=account["creationDate"],
                 role=account["role"],
                 status=account["status"],
-                db=db
+                db=db,
             )
         else:
             print(f"Password '${password}' is incorrect.")
@@ -72,20 +74,26 @@ class Account:
             errors.append("Password must be at least 8 characters long.")
 
         if not any(char.isupper() for char in password):
-            errors.append("Password must contain at least one uppercase letter.")
+            errors.append(
+                "Password must contain at least one uppercase letter.")
 
         if not any(char.islower() for char in password):
-            errors.append("Password must contain at least one lowercase letter.")
+            errors.append(
+                "Password must contain at least one lowercase letter.")
 
         if not any(char.isdigit() for char in password):
             errors.append("Password must contain at least one digit.")
 
         if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-            errors.append("Password must contain at least one special character.")
+            errors.append(
+                "Password must contain at least one special character.")
 
         return errors
 
-    def verify_perms(self, required_roles: list[Role], inverse: bool = False) -> bool:
+    def verify_perms(
+            self,
+            required_roles: list[Role],
+            inverse: bool = False) -> bool:
         """
         Check if the user's role matches the required roles.
 
@@ -112,17 +120,21 @@ class Account:
 
         if "email" in filtered_fields:
             try:
-                filtered_fields["email"] = str(filtered_fields["email"].strip().lower())
+                filtered_fields["email"] = str(
+                    filtered_fields["email"].strip().lower())
             except ValidationError:
                 return {"error": "Invalid email format."}
 
         if "status" in filtered_fields:
             try:
-                filtered_fields["status"] = Role(filtered_fields["status"])
+                filtered_fields["status"] = Status(filtered_fields["status"])
             except ValidationError:
                 raise ValidationError(["Status does not exist"])
 
-        success: bool = bool(self.db.update_account(self.accountID, **filtered_fields))
+        success: bool = bool(
+            self.db.update_account(
+                self.accountID,
+                **filtered_fields))
 
         if success:
             for key, value in filtered_fields.items():
@@ -136,7 +148,9 @@ class Account:
 
         try:
             hashed: str = self._hash_password(new_password)
-            success: bool = bool(self.db.update_account(self.accountID, password=hashed))
+            success: bool = bool(
+                self.db.update_account(self.accountID, password=hashed)
+            )
 
             if not success:
                 raise RuntimeError("Failed to update password in database")

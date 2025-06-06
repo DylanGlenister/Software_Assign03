@@ -17,8 +17,9 @@ class AdminAccount(Account):
         super().__init__(*args, **kwargs)
 
     def change_others_password(
-        self, new_password: str, account_id: int
-    ) -> None:
+            self,
+            new_password: str,
+            account_id: int) -> None:
         """Change another user's password with admin privileges.
 
         Args:
@@ -32,8 +33,8 @@ class AdminAccount(Account):
         """
         if errors := self.verify_password(new_password):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(errors)
-            )
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(errors))
 
         hashed_password = self._hash_password(new_password)
         if not self.db.update_account(account_id, password=hashed_password):
@@ -45,8 +46,10 @@ class AdminAccount(Account):
         self.password = hashed_password
 
     def create_account(
-        self, role: Role, email: EmailStr, password: str
-    ) -> int:
+            self,
+            role: Role,
+            email: EmailStr,
+            password: str) -> int:
         """Create a new user account with admin privileges.
 
         Args:
@@ -71,13 +74,15 @@ class AdminAccount(Account):
 
         if errors := self.verify_password(password):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(errors)
-            )
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(errors))
 
         account_id = self.db.create_account(
-            email=email.lower().strip(),
-            password=self._hash_password(password),
-            role=role,
+            role,
+            email.lower().strip(),
+            self._hash_password(password),
+            firstName="",
+            lastName=""
         )
 
         if not account_id:
@@ -92,7 +97,6 @@ class AdminAccount(Account):
         """Retrieve account details by ID.
 
         Args:
-            db: Database connection instance
             account_id: Target account ID to retrieve
 
         Returns:
@@ -101,7 +105,9 @@ class AdminAccount(Account):
         Raises:
             HTTPException: 404 if account not found
         """
-        if not (account := self.db.get_account(account_id=account_id)):
+        account = self.db.get_account(accountId=account_id)
+        print(account_id, account)
+        if not (account):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Account {account_id} not found",
@@ -113,7 +119,6 @@ class AdminAccount(Account):
         """Deactivate an account without deleting it.
 
         Args:
-            db: Database connection instance
             account_id: Target account ID to deactivate
 
         Returns:
@@ -123,7 +128,7 @@ class AdminAccount(Account):
             HTTPException: 404 if account not found
             HTTPException: 500 if update fails
         """
-        self.get_account(self.db, account_id)
+        self.get_account(account_id)
 
         if not self.db.update_account(account_id, status=Status.INACTIVE):
             raise HTTPException(
@@ -154,9 +159,7 @@ class AdminAccount(Account):
 
         return True
 
-    def get_all_accounts(
-        self, filters: Optional[dict] = None
-    ) -> list[dict]:
+    def get_all_accounts(self, filters: Optional[dict] = None) -> list[dict]:
         """Retrieve all accounts with optional filtering.
 
         Args:

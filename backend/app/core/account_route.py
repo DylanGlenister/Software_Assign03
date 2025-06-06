@@ -8,7 +8,10 @@ from ..utils.settings import SETTINGS
 from ..utils.token import create_token, get_account_data
 from .database import Database, Role, Status, get_db
 
-account_route = APIRouter(prefix=SETTINGS.api_path + "/accounts", tags=["accounts"])
+account_route = APIRouter(
+    prefix=SETTINGS.api_path +
+    "/accounts",
+    tags=["accounts"])
 
 
 class LoginPayload(BaseModel):
@@ -17,10 +20,10 @@ class LoginPayload(BaseModel):
 
 
 class UpdateAccountPayload(BaseModel):
-    email: Optional[EmailStr]
-    status: Optional[Status]
-    firstname: Optional[str]
-    lastname: Optional[str]
+    email: Optional[EmailStr] = None
+    status: Optional[Status] = None
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
 
 
 class ChangePasswordPayload(BaseModel):
@@ -33,7 +36,8 @@ def get_account(account_data: dict = Depends(get_account_data)) -> Account:
 
 @account_route.post("/login")
 def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
-    account: Account | None = Account.login(db, payload.email, payload.password)
+    account: Account | None = Account.login(
+        db, payload.email, payload.password)
 
     if not account:
         return {"message": "Invalid credentials"}
@@ -57,16 +61,12 @@ def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
         }
 
 
-@account_route.put("/update")
+@account_route.patch("/update")
 def update_account(
     payload: UpdateAccountPayload,
     account: Account = Depends(get_account),
 ):
-    # TODO This never gets reached somehow
-    print("Ping")
-    if not account.verify_perms(
-        [Role.GUEST], True
-    ):  # Dont allow guests to update their account
+    if account.role == Role.GUEST.value:  # Dont allow guests to update their account
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Guests cannot update their accounts. Please log in",
@@ -82,9 +82,8 @@ def change_password(
     payload: ChangePasswordPayload,
     account: Account = Depends(get_account),
 ):
-    if account.verify_perms(
-        [Role.GUEST], True
-    ):  # Dont allow guests to update their account
+
+    if account.role == Role.GUEST.value:  # Dont allow guests to update their account
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Guests cannot update their accounts. Please log in",
@@ -93,7 +92,9 @@ def change_password(
     try:
         result = account.change_password(payload.new_password)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e))
 
     if not result:
         raise HTTPException(

@@ -34,7 +34,8 @@ class SortOptions(str, Enum):
 
 # This dependency provides a Catalogue service instance for each request,
 # ensuring that every operation gets a fresh, isolated database session.
-def get_catalogue_service(db: Annotated[Database, Depends(get_db)]) -> Catalogue:
+def get_catalogue_service(
+        db: Annotated[Database, Depends(get_db)]) -> Catalogue:
     """
     FastAPI dependency to provide a Catalogue service instance.
     """
@@ -99,18 +100,15 @@ def list_all_products(
     response_model=list[Product],
     summary="Search for Products",
 )
-def search_products(
-    catalogue: Annotated[Catalogue, Depends(get_catalogue_service)],
-    query: Annotated[
-        str, Query(description="Search term for product name, description, or tags.")
-    ],
-    available_only: Annotated[
-        bool, Query(description="Filter for products with available stock.")
-    ] = False,
-    sort_by: Annotated[
-        SortOptions | None, Query(description="Sort products by price.")
-    ] = None,
-):
+def search_products(catalogue: Annotated[Catalogue,
+                                         Depends(get_catalogue_service)],
+                    query: Annotated[str,
+                                     Query(description="Search term for product name, description, or tags.")],
+                    available_only: Annotated[bool,
+                                              Query(description="Filter for products with available stock.")] = False,
+                    sort_by: Annotated[SortOptions | None,
+                                       Query(description="Sort products by price.")] = None,
+                    ):
     """
     Searches for products matching a query string.
 
@@ -120,36 +118,39 @@ def search_products(
     found_products = catalogue.search_products(query)
     return _process_products(found_products, available_only, sort_by)
 
-@catalogue_route.get(
-    "/tags",
-    response_model=list[TagResponse],
-    summary="Get All Tags"
-)
-def get_all_tags_route(catalogue: Annotated[Catalogue, Depends(get_catalogue_service)]):
+
+@catalogue_route.get("/tags",
+                     response_model=list[TagResponse],
+                     summary="Get All Tags")
+def get_all_tags_route(
+        catalogue: Annotated[Catalogue, Depends(get_catalogue_service)]):
     """Retrieves all tags from the system."""
     tags_data = catalogue.db.get_all_tags()
     if tags_data is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve tags.")
-    return [TagResponse(tagID=tag['tagID'], name=tag['name']) for tag in tags_data]
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve tags.",
+        )
+    return [TagResponse(tagID=tag["tagID"], name=tag["name"])
+            for tag in tags_data]
+
 
 @catalogue_route.get(
     "/tagged",
     response_model=list[Product],
     summary="Get Products by Tags",
 )
-def get_products_by_tags(
-    catalogue: Annotated[Catalogue, Depends(get_catalogue_service)],
-    tags: Annotated[
-        list[str],
-        Query(alias="t", description="One or more tags to filter products by."),
-    ],
-    available_only: Annotated[
-        bool, Query(description="Filter for products with available stock.")
-    ] = False,
-    sort_by: Annotated[
-        SortOptions | None, Query(description="Sort products by price.")
-    ] = None,
-):
+def get_products_by_tags(catalogue: Annotated[Catalogue,
+                                              Depends(get_catalogue_service)],
+                         tags: Annotated[list[str],
+                                         Query(alias="t",
+                                               description="One or more tags to filter products by."),
+                                         ],
+                         available_only: Annotated[bool,
+                                                   Query(description="Filter for products with available stock.")] = False,
+                         sort_by: Annotated[SortOptions | None,
+                                            Query(description="Sort products by price.")] = None,
+                         ):
     """
     Retrieves products that are associated with all of the specified tags.
 

@@ -166,8 +166,7 @@ class Catalogue:
         new_product = self.get_product_by_id(product_id)
         if not new_product:
             raise ValueError(
-                f"Failed to retrieve newly created product with ID: {product_id}"
-            )
+                f"Failed to retrieve newly created product with ID: {product_id}")
 
         return new_product
 
@@ -186,7 +185,8 @@ class Catalogue:
         Returns:
             The updated Product model instance, or None if the product was not found.
         """
-        update_data = product_update.model_dump(exclude_unset=True, by_alias=True)
+        update_data = product_update.model_dump(
+            exclude_unset=True, by_alias=True)
 
         if not update_data:
             return self.get_product_by_id(product_id)

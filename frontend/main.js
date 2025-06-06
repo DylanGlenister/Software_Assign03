@@ -1,5 +1,6 @@
 let API_BASE_URL = 'http://localhost:8000/api/v1/endpoints';
 let AUTH_TOKEN = null; 
+let CURRENT_USER_ROLE = null;
 
 // --- UTILITY FUNCTIONS (accessible globally) ---
 async function makeRequest(endpoint, method = 'GET', body = null, requireAuth = false) {
@@ -49,6 +50,51 @@ async function makeRequest(endpoint, method = 'GET', body = null, requireAuth = 
         responseData.data.error = error.message;
         return responseData;
     }
+}
+
+function updateSidebarAccessIndicators() {
+    const navItems = document.querySelectorAll('.sidebar .nav-item');
+    if (!navItems.length) return;
+
+    const sectionAccessRules = {
+        'info': null,
+        'accounts': null,
+        'customer': ['customer', 'employee', 'admin', 'owner'],
+        'catalogue': null,
+        'employee': ['employee', 'admin', 'owner'],
+        'admin': ['admin', 'owner'],
+        'config': null
+    };
+
+    navItems.forEach(item => {
+        const sectionName = item.getAttribute('data-section');
+        const requiredRoles = sectionAccessRules[sectionName];
+        let hasAccess = false;
+
+        const existingIndicator = item.querySelector('.access-indicator');
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+
+        if (requiredRoles === null) {
+            hasAccess = true;
+        } else if (CURRENT_USER_ROLE && requiredRoles.includes(CURRENT_USER_ROLE.toLowerCase())) {
+            hasAccess = true;
+        }
+
+        const indicatorSpan = document.createElement('span');
+        indicatorSpan.classList.add('access-indicator');
+        if (hasAccess) {
+            indicatorSpan.textContent = ' ✅'; 
+            indicatorSpan.style.color = 'green';
+            indicatorSpan.title = 'Accessible';
+        } else {
+            indicatorSpan.textContent = ' ❌';
+            indicatorSpan.style.color = 'red';
+            indicatorSpan.title = 'Restricted (requires login with appropriate role)';
+        }
+        item.appendChild(indicatorSpan);
+    });
 }
 
 function displayResponse(elementId, response) {
@@ -288,7 +334,7 @@ function setupNavigation() {
             loadSection(targetSection);
         });
     });
-
+    updateSidebarAccessIndicators();
 }
 
 // --- INITIALIZATION ---
@@ -309,4 +355,10 @@ document.addEventListener('DOMContentLoaded', function() {
         infoNavItem?.classList.add('active');
     }
     loadSection(defaultSectionName);
+
+    if (typeof manageTokenSectionDisplay === 'function') {
+         manageTokenSectionDisplay();
+    } else {
+        updateSidebarAccessIndicators();
+    }
 });

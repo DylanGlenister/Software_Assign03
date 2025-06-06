@@ -10,7 +10,8 @@ from ..utils.settings import SETTINGS
 admin_route = APIRouter(prefix=SETTINGS.api_path + "/admin", tags=["admin"])
 
 
-def get_admin_account(account_data: dict = Depends(get_account_data)) -> AdminAccount:
+def get_admin_account(account_data: dict = Depends(
+        get_account_data)) -> AdminAccount:
     account = AdminAccount(**account_data)
     if not account.verify_perms([Role.ADMIN]):
         raise HTTPException(
@@ -99,15 +100,15 @@ def delete_account_route(
 
 
 @admin_route.get("/accounts")
-def get_all_accounts_route(
-    admin: AdminAccount = Depends(get_admin_account)
-):
+def get_all_accounts_route(admin: AdminAccount = Depends(get_admin_account)):
     try:
         accounts = admin.get_all_accounts()
     except HTTPException:
         raise
 
-    return {"message": "Accounts were successfully retrieved", "accounts": accounts}
+    return {
+        "message": "Accounts were successfully retrieved",
+        "accounts": accounts}
 
 
 @admin_route.delete("/deleteAccounts")

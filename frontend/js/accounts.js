@@ -40,6 +40,7 @@ async function handleLogin(e) {
         console.error("Login failed response:", response);
     }
     displayResponse('loginResponse', response);
+    updateSidebarAccessIndicators()
     setFormLoading('loginForm', false);
 }
 
@@ -56,7 +57,7 @@ async function handleUpdateAccount(e) {
     if (status !== "") payload.status = status;
     if (firstName !== "") payload.firstname = firstName
     if (lastName !== "") payload.lastname = lastName
-    
+    console.log(payload)
     if (Object.keys(payload).length === 0) {
         showNotification('No data provided for update.', 'info');
         displayResponse('updateAccountResponse', { info: "No changes to update." });
@@ -64,7 +65,7 @@ async function handleUpdateAccount(e) {
         return;
     }
 
-    const response = await makeRequest('/accounts/update', 'PUT', payload, true);
+    const response = await makeRequest('/accounts/update', 'PATCH', payload, true);
     if (response.ok) showNotification('Account updated successfully!', 'success');
     else showNotification('Failed to update account!', 'error');
 

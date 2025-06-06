@@ -30,6 +30,10 @@ function manageTokenSectionDisplay() {
         if (actualTokenDataEl) actualTokenDataEl.style.display = 'none';
         if (rawTokenDisplayEl) rawTokenDisplayEl.style.display = 'none';
         if (tokenDetailsErrorEl) tokenDetailsErrorEl.style.display = 'none';
+        if (typeof updateSidebarAccessIndicators === 'function') {
+            CURRENT_USER_ROLE = null;
+            updateSidebarAccessIndicators();
+        }
         clearTokenDetailsUIData();
         clearTokenCountdown();
     }
@@ -50,6 +54,12 @@ function handleClearToken() {
     AUTH_TOKEN = null;
     localStorage.removeItem('authToken');
     showNotification('Token cleared successfully!', 'success');
+
+    if (typeof updateSidebarAccessIndicators === 'function') {
+        CURRENT_USER_ROLE = null;
+        updateSidebarAccessIndicators();
+    }
+
     manageTokenSectionDisplay();
 }
 
@@ -87,9 +97,9 @@ async function fetchAndDisplayTokenDetails() {
         const date = new Date(tokenInfo.expires_at);
 
         const options = {
-        weekday: "long",   // e.g. Tuesday
+        weekday: "long",
         year: "numeric",
-        month: "long",     // e.g. June
+        month: "long",
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit",
@@ -108,6 +118,11 @@ async function fetchAndDisplayTokenDetails() {
         updateRawTokenValue();
         document.getElementById('currentToken').style.display = 'block';
 
+        if (typeof updateSidebarAccessIndicators === 'function') {
+            CURRENT_USER_ROLE = userSpecificData.role ? userSpecificData.role.toLowerCase() : null;
+            updateSidebarAccessIndicators();
+        }
+
         startTokenCountdown(tokenInfo.time_remaining_seconds);
     } else {
         let errorMessage = 'Failed to fetch token details.';
@@ -122,6 +137,11 @@ async function fetchAndDisplayTokenDetails() {
         }
         showNotification(errorMessage, 'error');
         clearTokenDetailsUIData(false);
+
+        if (typeof updateSidebarAccessIndicators === 'function') {
+            CURRENT_USER_ROLE = null;
+            updateSidebarAccessIndicators();
+        }
         clearTokenCountdown();
     }
 }

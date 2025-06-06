@@ -7,7 +7,10 @@ from ..core.database import Database, get_db, Role
 from ..utils.token import get_token, get_account_data, create_token
 from ..utils.settings import SETTINGS
 
-customer_route = APIRouter(prefix=SETTINGS.api_path + "/customer", tags=["customer"])
+customer_route = APIRouter(
+    prefix=SETTINGS.api_path +
+    "/customer",
+    tags=["customer"])
 
 
 def get_customer_account(
@@ -94,7 +97,10 @@ def add_to_trolley_route(
 
     result: dict = {"token": customer_data.get("token")}
 
-    success: bool = bool(customer.trolley.add_line_item(item.product_id, item.amount))
+    success: bool = bool(
+        customer.trolley.add_line_item(
+            item.product_id,
+            item.amount))
     if success:
         result["message"] = "Item has been added to the trolley"
     else:
@@ -113,7 +119,9 @@ def modify_number_in_trolley(
 
     result: dict = {"token": customer_data.get("token")}
 
-    success: bool = bool(customer.trolley.update_quantity(item.product_id, item.amount))
+    success: bool = bool(
+        customer.trolley.update_quantity(
+            item.product_id, item.amount))
     if success:
         result["message"] = "Item quantity has been modified in the trolley"
     else:
@@ -158,9 +166,8 @@ def clear_trolley_route(customer_data: dict = Depends(get_customer_account)):
 
 
 @customer_route.get("/orders")
-def customer_get_orders(
-    db: Database = Depends(get_db), customer_data: dict = Depends(get_customer_account)
-):
+def customer_get_orders(db: Database = Depends(get_db),
+                        customer_data: dict = Depends(get_customer_account)):
     customer: CustomerAccount | None = customer_data.get("account")
 
     if not isinstance(customer, CustomerAccount):
