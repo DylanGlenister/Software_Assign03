@@ -20,10 +20,10 @@ class LoginPayload(BaseModel):
 
 
 class UpdateAccountPayload(BaseModel):
-    email: Optional[EmailStr]
-    status: Optional[Status]
-    firstname: Optional[str]
-    lastname: Optional[str]
+    email: Optional[EmailStr] = None
+    status: Optional[Status] = None
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
 
 
 class ChangePasswordPayload(BaseModel):
@@ -61,7 +61,7 @@ def login_route(payload: LoginPayload, db: Database = Depends(get_db)):
         }
 
 
-@account_route.put("/update")
+@account_route.patch("/update")
 def update_account(
     payload: UpdateAccountPayload,
     account: Account = Depends(get_account),

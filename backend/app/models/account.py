@@ -127,7 +127,7 @@ class Account:
 
         if "status" in filtered_fields:
             try:
-                filtered_fields["status"] = Role(filtered_fields["status"])
+                filtered_fields["status"] = Status(filtered_fields["status"])
             except ValidationError:
                 raise ValidationError(["Status does not exist"])
 
