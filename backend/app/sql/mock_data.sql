@@ -159,9 +159,9 @@ INSERT INTO `Report` (`creator`, `creationDate`, `data`) VALUES
 -- Weak entities (Junction Tables)
 
 -- -----------------------------------------------------
--- Table `Product-Tag`
+-- Table `ProductTag`
 -- -----------------------------------------------------
-INSERT INTO `Product-Tag` (`productID`, `tagID`) VALUES
+INSERT INTO `ProductTag` (`productID`, `tagID`) VALUES
 (1, 1), -- UltraSlim Laptop Pro 15.6" -> Electronics
 (1, 6), -- UltraSlim Laptop Pro 15.6" -> PC Gaming Peripherals (can be used for gaming)
 (2, 1), -- Precision Wireless Ergonomic Mouse -> Electronics
@@ -178,9 +178,9 @@ INSERT INTO `Product-Tag` (`productID`, `tagID`) VALUES
 (8, 3); -- Gourmet Master 8-Piece Chef's Knife Set -> Home & Kitchen Appliances
 
 -- -----------------------------------------------------
--- Table `Product-Image`
+-- Table `ProductImage`
 -- -----------------------------------------------------
-INSERT INTO `Product-Image` (`productID`, `imageID`) VALUES
+INSERT INTO `ProductImage` (`productID`, `imageID`) VALUES
 (1, 1),  -- UltraSlim Laptop Pro 15.6"
 (1, 9),  -- UltraSlim Laptop Pro 15.6" (Alt View)
 (2, 2),  -- Precision Wireless Ergonomic Mouse

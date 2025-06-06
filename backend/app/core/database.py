@@ -719,7 +719,7 @@ class Database:
         query = """
 			SELECT i.url
 			FROM Image i
-			JOIN `Product-Image` pi ON i.imageID = pi.imageID
+			JOIN `ProductImage` pi ON i.imageID = pi.imageID
 			WHERE pi.productID = %s
 		"""
         result = self._fetch_all(query, (productID,))
@@ -766,7 +766,7 @@ class Database:
                 GROUP_CONCAT(DISTINCT t.name SEPARATOR ',') AS tags
             FROM
                 Product p
-            JOIN `Product-Tag` pt ON p.productID = pt.productID
+            JOIN `ProductTag` pt ON p.productID = pt.productID
             JOIN `Tag` t ON pt.tagID = t.tagID
             WHERE
                 t.name IN ({placeholders})
@@ -838,7 +838,7 @@ class Database:
 
     def delete_tag(self, tagID: ID, /) -> int:
         """
-        Deletes a tag by its ID. Associated entries in Product-Tag will be cascade deleted.
+        Deletes a tag by its ID. Associated entries in ProductTag will be cascade deleted.
 
         Args:
                 tagID: The ID of the tag to delete.
@@ -876,7 +876,7 @@ class Database:
                 mariadb.IntegrityError: If the product already has the tag or an ID is invalid.
                 Exception: For other failures.
         """
-        query = "INSERT INTO `Product-Tag` (productID, tagID) VALUES (%s, %s)"
+        query = "INSERT INTO `ProductTag` (productID, tagID) VALUES (%s, %s)"
         try:
             affected_rows = self._execute(query, (productId, tagID))
             if affected_rows is None:
@@ -909,7 +909,7 @@ class Database:
                 ValueError: If the tag is not associated with the product.
                 Exception: For other failures.
         """
-        query = "DELETE FROM `Product-Tag` WHERE productID = %s AND tagID = %s"
+        query = "DELETE FROM `ProductTag` WHERE productID = %s AND tagID = %s"
         try:
             affected_rows = self._execute(query, (productID, tagID))
             if affected_rows is None:
@@ -943,7 +943,7 @@ class Database:
         query = """
             SELECT t.name
             FROM `Tag` t
-            JOIN `Product-Tag` pt ON t.tagID = pt.tagID
+            JOIN `ProductTag` pt ON t.tagID = pt.tagID
             WHERE pt.productID = %s
         """
         return self._fetch_all(query, (productID,))
@@ -974,7 +974,7 @@ class Database:
                 raise Exception("Failed to create image entry, image_id is None.")
 
             link_query = (
-                "INSERT INTO `Product-Image` (productID, imageID) VALUES (%s, %s)"
+                "INSERT INTO `ProductImage` (productID, imageID) VALUES (%s, %s)"
             )
             link_result = self._execute(link_query, (productID, image_id))
 
@@ -992,7 +992,7 @@ class Database:
 
     def delete_image(self, imageID: ID, /) -> int:
         """
-        Deletes an image by its ID. Associated entries in Product-Image will be cascade deleted.
+        Deletes an image by its ID. Associated entries in ProductImage will be cascade deleted.
 
         Args:
                 _imageId: The ID of the image to delete.
@@ -1844,11 +1844,11 @@ class DatabaseTests:
         # Check if image is gone from Image table
         img_check = db._fetch_one("SELECT 1 FROM Image WHERE imageID = %s", (img_id,))
         assert img_check is None, "Image not deleted from Image table"
-        # Check if association is gone from Product-Image (due to cascade)
+        # Check if association is gone from ProductImage (due to cascade)
         img_assoc_check = db._fetch_one(
-            "SELECT 1 FROM `Product-Image` WHERE imageID = %s", (img_id,)
+            "SELECT 1 FROM `ProductImage` WHERE imageID = %s", (img_id,)
         )
-        assert img_assoc_check is None, "Product-Image association not cascade deleted"
+        assert img_assoc_check is None, "ProductImage association not cascade deleted"
         assert not db.get_product_images(
             prod_id
         ), "get_product_images still finds images after delete_image"

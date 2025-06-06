@@ -4,8 +4,8 @@
 # Overwrite existing tables
 DROP TABLE IF EXISTS `OrderItem`;
 DROP TABLE IF EXISTS `Trolley`;
-DROP TABLE IF EXISTS `Product-Image`;
-DROP TABLE IF EXISTS `Product-Tag`;
+DROP TABLE IF EXISTS `ProductImage`;
+DROP TABLE IF EXISTS `ProductTag`;
 DROP TABLE IF EXISTS `Report`;
 DROP TABLE IF EXISTS `Receipt`;
 DROP TABLE IF EXISTS `Invoice`;
@@ -116,7 +116,7 @@ CREATE TABLE `Report` (
 
 # Weak entities
 
-CREATE TABLE `Product-Tag` (
+CREATE TABLE `ProductTag` (
 	`productID` INT NOT NULL,
 	`tagID` INT NOT NULL,
 	PRIMARY KEY (`productID`, `tagID`),
@@ -124,7 +124,7 @@ CREATE TABLE `Product-Tag` (
 	CONSTRAINT `product-tag_FK_tag` FOREIGN KEY (`tagID`) REFERENCES `Tag` (`tagID`) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-CREATE TABLE `Product-Image` (
+CREATE TABLE `ProductImage` (
 	`productID` INT NOT NULL,
 	`imageID` INT NOT NULL,
 	PRIMARY KEY (`productID`, `imageID`),
